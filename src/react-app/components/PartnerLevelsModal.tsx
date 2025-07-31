@@ -38,7 +38,11 @@ export default function PartnerLevelsModal({ isOpen, onClose, onSave }: PartnerL
     }
   };
 
-  const updateLevel = (id: number, field: keyof PartnerLevel, value: any) => {
+  const updateLevel = (
+    id: number,
+    field: keyof PartnerLevel,
+    value: string | number | boolean,
+  ) => {
     setLevels(levels.map(level => 
       level.id === id ? { ...level, [field]: value } : level
     ));

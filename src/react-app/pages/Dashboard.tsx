@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@getmocha/users-service/react';
+import { useAuth } from '@/auth';
 import { useNavigate } from 'react-router';
 import Header from '@/react-app/components/Header';
 import StatsCard from '@/react-app/components/StatsCard';

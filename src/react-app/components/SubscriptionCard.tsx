@@ -32,7 +32,7 @@ export default function SubscriptionCard() {
         const errorData = await response.json();
         setDetails({ error: errorData.error });
       }
-    } catch (error) {
+    } catch {
       setDetails({ error: 'Failed to fetch subscription details' });
     } finally {
       setLoading(false);
@@ -44,8 +44,8 @@ export default function SubscriptionCard() {
       await navigator.clipboard.writeText(text);
       setCopied(label);
       setTimeout(() => setCopied(null), 2000);
-    } catch (error) {
-      console.error('Failed to copy:', error);
+    } catch {
+      console.error('Failed to copy');
     }
   };
 

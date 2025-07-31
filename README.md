@@ -1,10 +1,37 @@
-## SecureLink VPN
+# SecureLink VPN
 
-This app was created using https://getmocha.com.
-Need help or want to join the community? Join our [Discord](https://discord.gg/shDEGBSe2d).
+Проект обеспечивает личный кабинет для управления VPN-сервисом. Аутентификация выполняется через собственный сервер Hunko.
 
-To run the devserver:
-```
+## Запуск в разработке
+
+```bash
 npm install
 npm run dev
 ```
+
+## Установка
+
+Запустите скрипт `install.sh`, который установит зависимости и подготовит окружение:
+
+```bash
+./install.sh
+```
+
+## Конфигурация
+
+Перед запуском задайте переменные окружения:
+
+- `HUNKO_USERS_SERVICE_API_URL` – адрес сервиса аутентификации Hunko
+- `HUNKO_USERS_SERVICE_API_KEY` – ключ доступа к сервису аутентификации
+
+## Kubernetes
+
+Манифест для развертывания находится в каталоге `k8s/`. Примените его командой:
+
+```bash
+kubectl apply -f k8s/deployment.yaml
+```
+
+## Логи разработки
+
+Все заметки по изменениям фиксируются в файле `docs/development-log.md`.

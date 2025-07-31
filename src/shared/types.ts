@@ -2,7 +2,7 @@ import z from "zod";
 
 export const VpnUserSchema = z.object({
   id: z.number(),
-  mocha_user_id: z.string(),
+  hunko_user_id: z.string(),
   username: z.string().nullable(),
   email: z.string(),
   is_active: z.boolean(),

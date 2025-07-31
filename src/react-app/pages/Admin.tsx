@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@getmocha/users-service/react';
+import { useAuth } from '@/auth';
 import { useNavigate } from 'react-router';
 import Header from '@/react-app/components/Header';
 import PlanModal from '@/react-app/components/PlanModal';
@@ -60,7 +60,7 @@ export default function Admin() {
   const [showGiveSubModal, setShowGiveSubModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<{ id: number; email: string } | null>(null);
   const [showPartnerLevelsModal, setShowPartnerLevelsModal] = useState(false);
-  const [partnerStats, setPartnerStats] = useState<any>(null);
+  const [partnerStats, setPartnerStats] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (!user) {

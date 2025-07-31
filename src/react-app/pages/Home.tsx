@@ -1,4 +1,4 @@
-import { useAuth } from '@getmocha/users-service/react';
+import { useAuth } from '@/auth';
 import LoginScreen from '@/react-app/components/LoginScreen';
 import Dashboard from '@/react-app/pages/Dashboard';
 import { Loader2 } from 'lucide-react';

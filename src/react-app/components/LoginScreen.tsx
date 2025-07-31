@@ -1,4 +1,4 @@
-import { useAuth } from '@getmocha/users-service/react';
+import { useAuth } from '@/auth';
 import { Shield, Lock, Globe, Zap } from 'lucide-react';
 
 export default function LoginScreen() {
