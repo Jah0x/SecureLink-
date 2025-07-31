@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@getmocha/users-service/react';
+import { useAuth } from '@/auth';
 import { Link, useLocation } from 'react-router';
 import { Shield, LogOut, User, Settings, ShoppingCart } from 'lucide-react';
 

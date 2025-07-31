@@ -42,7 +42,7 @@ export default function MarzbanStatsCard() {
         setError(errorData.error || 'Failed to fetch stats');
         setStats(null);
       }
-    } catch (err) {
+    } catch {
       setError('Connection failed');
       setStats(null);
     } finally {

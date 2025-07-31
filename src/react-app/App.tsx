@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
-import { AuthProvider } from '@getmocha/users-service/react';
+import { AuthProvider } from '@/auth';
 import HomePage from "@/react-app/pages/Home";
 import AuthCallback from "@/react-app/pages/AuthCallback";
 import Dashboard from "@/react-app/pages/Dashboard";

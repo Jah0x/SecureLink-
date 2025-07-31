@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: securelink
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: securelink
+  template:
+    metadata:
+      labels:
+        app: securelink
+    spec:
+      containers:
+        - name: securelink
+          image: securelink:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: HUNKO_USERS_SERVICE_API_URL
+              value: "https://auth.example.com"
+            - name: HUNKO_USERS_SERVICE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: securelink-secrets
+                  key: hunkoApiKey
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: securelink
+spec:
+  selector:
+    app: securelink
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
