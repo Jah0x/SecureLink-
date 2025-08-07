@@ -1,7 +1,18 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
+interface GoogleUserData {
+  name?: string;
+  given_name?: string;
+}
+
+interface User {
+  email: string;
+  google_user_data?: GoogleUserData;
+  [key: string]: unknown;
+}
+
 interface AuthContextType {
-  user: Record<string, unknown> | null;
+  user: User | null;
   isPending: boolean;
   isFetching: boolean;
   redirectToLogin: () => Promise<void>;
@@ -19,7 +30,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<Record<string, unknown> | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isPending, setPending] = useState(true);
   const [isFetching, setFetching] = useState(false);
 
@@ -28,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetch('/api/users/me');
         if (res.ok) {
-          const data = await res.json();
+          const data: User = await res.json();
           setUser(data);
         }
       } finally {
@@ -59,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const res = await fetch('/api/users/me');
     if (res.ok) {
-      setUser(await res.json());
+      setUser((await res.json()) as User);
     }
   };
 
