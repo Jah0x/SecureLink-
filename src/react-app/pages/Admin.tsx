@@ -44,6 +44,13 @@ interface VpnUserInfo {
   created_at: string;
 }
 
+interface PartnerStats {
+  total_partners: number;
+  active_partners: number;
+  total_payouts: number;
+  total_referrals: number;
+}
+
 export default function Admin() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -60,7 +67,7 @@ export default function Admin() {
   const [showGiveSubModal, setShowGiveSubModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<{ id: number; email: string } | null>(null);
   const [showPartnerLevelsModal, setShowPartnerLevelsModal] = useState(false);
-  const [partnerStats, setPartnerStats] = useState<Record<string, unknown> | null>(null);
+  const [partnerStats, setPartnerStats] = useState<PartnerStats | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -107,7 +114,7 @@ export default function Admin() {
       }
 
       if (partnerStatsRes.ok) {
-        const partnerStatsData = await partnerStatsRes.json();
+        const partnerStatsData = (await partnerStatsRes.json()) as PartnerStats;
         setPartnerStats(partnerStatsData);
       }
     } catch (error) {
