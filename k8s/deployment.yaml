@@ -19,7 +19,7 @@ spec:
             - containerPort: 3000
           env:
             - name: HUNKO_USERS_SERVICE_API_URL
-              value: "https://auth.example.com"
+              value: "http://hunko-users:8000"
             - name: HUNKO_USERS_SERVICE_API_KEY
               valueFrom:
                 secretKeyRef:
