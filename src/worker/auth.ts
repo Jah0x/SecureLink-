@@ -3,57 +3,51 @@ import { getCookie } from 'hono/cookie';
 
 declare const process: { env: Record<string, string | undefined> };
 
-export const HUNKO_SESSION_TOKEN_COOKIE_NAME = 'hunko_session_token';
+export const HUNKO_SESSION_TOKEN_COOKIE_NAME =
+  process.env.HUNKO_SESSION_TOKEN_COOKIE_NAME || 'hunko_session_token';
+
+export function parseOrigin(req: Request) {
+  const host = req.headers.get('host');
+  const proto = req.headers.get('x-forwarded-proto') || 'https';
+  const origin =
+    (host ? `${proto}://${host}` : undefined) ||
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    'https://dashboard.zerologsvpn.com';
+  return { proto, host, origin };
+}
 
 export function getOAuthRedirectUrl(
   provider: string,
-  dashboardUrl?: string,
+  dashboardOrigin?: string,
   redirectFromQuery?: string
 ) {
-  const dashboardOrigin =
-    dashboardUrl ||
+  const origin =
+    dashboardOrigin ||
     process.env.NEXT_PUBLIC_API_BASE_URL ||
-    "https://dashboard.zerologsvpn.com";
+    'https://dashboard.zerologsvpn.com';
 
   let redirect: string;
   try {
     redirect = redirectFromQuery
-      ? new URL(redirectFromQuery).toString()
-      : new URL("/thirdparty/callback", dashboardOrigin).toString();
+      ? new URL(redirectFromQuery, origin).toString()
+      : new URL('/thirdparty/callback', origin).toString();
   } catch {
-    redirect = "https://dashboard.zerologsvpn.com/thirdparty/callback";
+    redirect = new URL('/thirdparty/callback', origin).toString();
   }
 
   const hankoBase =
     process.env.HUNKO_USERS_SERVICE_API_URL ||
-    "http://hanko-public.securelink.svc.cluster.local";
+    process.env.NEXT_PUBLIC_HANKO_API_URL ||
+    'http://hanko-public.securelink.svc.cluster.local';
 
-  const u = new URL("/thirdparty/authorisationurl", hankoBase);
-  u.searchParams.set("thirdPartyId", provider);
-  u.searchParams.set("redirectURIOnProviderDashboard", redirect);
-  return u.toString();
-}
-
-export async function exchangeCodeForSessionToken(code: string, opts: { apiUrl: string; apiKey: string; }) {
-  const res = await fetch(`${opts.apiUrl}/sessions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': opts.apiKey },
-    body: JSON.stringify({ code }),
-  });
-  if (!res.ok) throw new Error('Failed to exchange code');
-  const data = await res.json();
-  return data.sessionToken || data.token;
-}
-
-export async function deleteSession(token: string, opts: { apiUrl: string; apiKey: string; }) {
-  await fetch(`${opts.apiUrl}/sessions`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}`, 'x-api-key': opts.apiKey },
-  });
+  return `${hankoBase}/thirdparty/authorisationurl?thirdPartyId=${provider}&redirectURIOnProviderDashboard=${encodeURIComponent(
+    redirect
+  )}`;
 }
 
 export const authMiddleware: MiddlewareHandler = async (c, next) => {
-  const token = getCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME);
+  const cookieName = c.env.HUNKO_SESSION_TOKEN_COOKIE_NAME || HUNKO_SESSION_TOKEN_COOKIE_NAME;
+  const token = getCookie(c, cookieName);
   if (!token) {
     return c.json({ error: 'Unauthorized' }, 401);
   }

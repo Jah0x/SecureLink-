@@ -58,11 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = async () => {
     setFetching(true);
     try {
-      const params = new URLSearchParams(window.location.search);
-      const redirectTo = params.get('redirectTo') || params.get('redirect_to') || '';
-      const callback = `${API_BASE_URL}/thirdparty/callback${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`;
       const res = await fetch(
-        `${API_BASE_URL}/thirdparty/google/redirect_url?redirect_url=${encodeURIComponent(callback)}`,
+        `${API_BASE_URL}/thirdparty/google/redirect_url?redirect_url=${encodeURIComponent(
+          API_BASE_URL + '/thirdparty/callback'
+        )}`,
         { credentials: 'include' }
       );
       if (res.ok) {
@@ -123,16 +122,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const exchangeCodeForSessionToken = async () => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
-    if (!code) throw new Error('Code not provided');
-    await fetch(`${API_BASE_URL}/api/sessions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ code }),
-    });
-    const res = await fetch(`${API_BASE_URL}/api/users/me`, { credentials: 'include' });
-    if (res.ok) {
-      setUser((await res.json()) as User);
+    const redirectTo = params.get('redirectTo') || params.get('redirect_to') || '/';
+    if (!code) {
+      alert('Код авторизации не найден');
+      window.location.replace('/auth');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) throw new Error('session exchange failed');
+      const meRes = await fetch(`${API_BASE_URL}/api/users/me`, { credentials: 'include' });
+      if (meRes.ok) {
+        setUser((await meRes.json()) as User);
+        window.location.replace(redirectTo);
+        return;
+      }
+      throw new Error('me failed');
+    } catch {
+      alert('Ошибка авторизации');
+      window.location.replace('/auth');
     }
   };
 

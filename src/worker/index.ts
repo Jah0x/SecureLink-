@@ -5,11 +5,12 @@ import { zValidator } from "@hono/zod-validator";
 import {
   getOAuthRedirectUrl,
   authMiddleware,
-  deleteSession,
   HUNKO_SESSION_TOKEN_COOKIE_NAME,
-} from "@/worker/auth";
+  parseOrigin,
+} from "./auth";
 import { getCookie, setCookie } from "hono/cookie";
 import { z } from "zod";
+import { exchangeCode, me as hankoMe, logout as hankoLogout } from "./hankoClient";
 import { 
   createMarzbanService, 
   generateMarzbanUsername, 
@@ -81,54 +82,42 @@ async function syncUserWithMarzban(env: Env, vpnUser: any, subscription: any) {
 
 // Auth routes
 app.get('/auth/authorisationurl', (c) => {
+  const provider = c.req.query('provider') || 'google';
+  const redirect = c.req.query('redirect_url') || undefined;
   try {
-    const provider = c.req.query('provider') || 'google';
-    const redirect = c.req.query('redirect_url') || undefined;
-    const host = c.req.header('host');
-    const proto = c.req.header('x-forwarded-proto') || 'http';
-    const origin = host ? `${proto}://${host}` : undefined;
+    const { origin } = parseOrigin(c.req.raw);
     const url = getOAuthRedirectUrl(provider, origin, redirect);
     return c.json({ redirectUrl: url });
-  } catch (e) {
+  } catch (e: any) {
     console.error('authorisationurl error:', e);
-    return c.json({ error: 'Failed to build redirect URL' }, 500);
+    return c.json({ message: 'Failed to build redirect URL', details: e.message }, 500);
   }
 });
 
 app.get('/thirdparty/:provider/redirect_url', (c) => {
+  const provider = c.req.param('provider');
+  const redirect = c.req.query('redirect_url') || undefined;
   try {
-    const provider = c.req.param('provider');
-    const redirect = c.req.query('redirect_url') || undefined;
-    const host = c.req.header('host');
-    const proto = c.req.header('x-forwarded-proto') || 'http';
-    const origin = host ? `${proto}://${host}` : undefined;
+    const { origin } = parseOrigin(c.req.raw);
     const url = getOAuthRedirectUrl(provider, origin, redirect);
     return c.json({ redirectUrl: url });
-  } catch (e) {
+  } catch (e: any) {
     console.error('/thirdparty redirect_url error:', e);
-    return c.json({ error: 'Failed to build redirect URL' }, 500);
+    return c.json({ message: 'Failed to build redirect URL', details: e.message }, 500);
   }
 });
 
-app.post("/api/sessions", zValidator("json", z.object({ code: z.string() })), async (c) => {
+app.post('/api/sessions', async (c) => {
   try {
-    const { code } = c.req.valid("json");
-    const res = await fetch(`${c.env.HUNKO_USERS_SERVICE_API_URL}/sessions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': c.env.HUNKO_USERS_SERVICE_API_KEY,
-      },
-      body: JSON.stringify({ code }),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('/api/sessions Hanko error:', res.status, text);
-      return c.json({ error: 'Failed to exchange code' }, res.status);
+    const body = await c.req.json<{ code?: string }>();
+    if (!body.code) {
+      return c.json({ message: 'code is required' }, 400);
     }
-    const data = await res.json();
+    const data = await exchangeCode(c.env, body.code);
     const token = data.sessionToken || data.token;
-    setCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME, token, {
+    const cookieName =
+      c.env.HUNKO_SESSION_TOKEN_COOKIE_NAME || HUNKO_SESSION_TOKEN_COOKIE_NAME;
+    setCookie(c, cookieName, token, {
       httpOnly: true,
       path: '/',
       sameSite: 'lax',
@@ -136,9 +125,10 @@ app.post("/api/sessions", zValidator("json", z.object({ code: z.string() })), as
       maxAge: data.expiresIn || 60 * 24 * 60 * 60,
     });
     return c.json({ user: data.user });
-  } catch (e) {
+  } catch (e: any) {
     console.error('/api/sessions error:', e);
-    return c.json({ error: 'Internal Server Error' }, 500);
+    const status = e.status || 500;
+    return c.json({ message: 'Failed to exchange code', details: e.message }, status);
   }
 });
 
@@ -182,7 +172,8 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ error: 'Login failed' }, res.status);
     }
     const data = await res.json();
-    setCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME, data.sessionToken || data.token, {
+    const cookieName = c.env.HUNKO_SESSION_TOKEN_COOKIE_NAME || HUNKO_SESSION_TOKEN_COOKIE_NAME;
+    setCookie(c, cookieName, data.sessionToken || data.token, {
       httpOnly: true,
       path: '/',
       sameSite: 'lax',
@@ -196,44 +187,33 @@ app.post('/api/auth/login', async (c) => {
   }
 });
 
-app.get("/api/users/me", async (c) => {
-  const token = getCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME);
+app.get('/api/users/me', async (c) => {
+  const cookieName = c.env.HUNKO_SESSION_TOKEN_COOKIE_NAME || HUNKO_SESSION_TOKEN_COOKIE_NAME;
+  const token = getCookie(c, cookieName);
   if (!token) {
-    return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ message: 'Unauthorized' }, 401);
   }
   try {
-    const res = await fetch(`${c.env.HUNKO_USERS_SERVICE_API_URL}/users/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'x-api-key': c.env.HUNKO_USERS_SERVICE_API_KEY,
-      },
-    });
-    if (!res.ok) {
-      console.error('/api/users/me Hanko error:', res.status);
-      return c.json({ error: 'Unauthorized' }, res.status);
-    }
-    const user = await res.json();
+    const user = await hankoMe(c.env, token);
     return c.json(user);
-  } catch (e) {
-    console.error('/api/users/me error:', e);
-    return c.json({ error: 'Internal Server Error' }, 500);
+  } catch (e: any) {
+    const status = e.status === 401 ? 401 : 502;
+    return c.json({ message: 'Unauthorized', details: e.message }, status);
   }
 });
 
 app.post('/api/logout', async (c) => {
-  const sessionToken = getCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME);
+  const cookieName = c.env.HUNKO_SESSION_TOKEN_COOKIE_NAME || HUNKO_SESSION_TOKEN_COOKIE_NAME;
+  const sessionToken = getCookie(c, cookieName);
   if (typeof sessionToken === 'string') {
     try {
-      await deleteSession(sessionToken, {
-        apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
-        apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
-      });
+      await hankoLogout(c.env, sessionToken);
     } catch (e) {
       console.error('/api/logout Hanko error:', e);
     }
   }
 
-  setCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME, '', {
+  setCookie(c, cookieName, '', {
     httpOnly: true,
     path: '/',
     sameSite: 'lax',
