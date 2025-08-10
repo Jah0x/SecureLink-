@@ -15,9 +15,9 @@ interface AuthContextType {
   user: User | null;
   isPending: boolean;
   isFetching: boolean;
-  redirectToLogin: () => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   loginWithPassword: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<boolean>;
   exchangeCodeForSessionToken: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -26,9 +26,9 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isPending: true,
   isFetching: false,
-  redirectToLogin: async () => {},
+  loginWithGoogle: async () => {},
   loginWithPassword: async () => {},
-  register: async () => {},
+  register: async () => false,
   exchangeCodeForSessionToken: async () => {},
   logout: async () => {},
 });
@@ -42,7 +42,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/users/me`);
+        const res = await fetch(`${API_BASE_URL}/api/users/me`, {
+          credentials: 'include',
+        });
         if (res.ok) {
           const data: User = await res.json();
           setUser(data);
@@ -53,12 +55,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const redirectToLogin = async () => {
+  const loginWithGoogle = async () => {
     setFetching(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/oauth/google/redirect_url`);
-      const data = await res.json();
-      window.location.href = data.redirectUrl;
+      const params = new URLSearchParams(window.location.search);
+      const redirectTo = params.get('redirectTo') || params.get('redirect_to') || '';
+      const callback = `${API_BASE_URL}/thirdparty/callback${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`;
+      const res = await fetch(
+        `${API_BASE_URL}/thirdparty/google/redirect_url?redirect_url=${encodeURIComponent(callback)}`,
+        { credentials: 'include' }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.redirectUrl) {
+          window.location.href = data.redirectUrl;
+          return;
+        }
+      }
+      alert('Не удалось получить ссылку авторизации');
     } finally {
       setFetching(false);
     }
@@ -67,16 +81,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithPassword = async (email: string, password: string) => {
     setFetching(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/password/login`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
-      if (res.ok) {
-        const me = await fetch(`${API_BASE_URL}/api/users/me`);
-        if (me.ok) {
-          setUser((await me.json()) as User);
-        }
+      if (!res.ok) {
+        alert('Ошибка входа');
+        return;
+      }
+      const me = await fetch(`${API_BASE_URL}/api/users/me`, { credentials: 'include' });
+      if (me.ok) {
+        setUser((await me.json()) as User);
       }
     } finally {
       setFetching(false);
@@ -86,11 +103,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (email: string, password: string) => {
     setFetching(true);
     try {
-      await fetch(`${API_BASE_URL}/api/password/register`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
+      if (!res.ok) {
+        alert('Ошибка регистрации');
+        return false;
+      }
+      await loginWithPassword(email, password);
+      return true;
     } finally {
       setFetching(false);
     }
@@ -103,22 +127,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await fetch(`${API_BASE_URL}/api/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ code }),
     });
-    const res = await fetch(`${API_BASE_URL}/api/users/me`);
+    const res = await fetch(`${API_BASE_URL}/api/users/me`, { credentials: 'include' });
     if (res.ok) {
       setUser((await res.json()) as User);
     }
   };
 
   const logout = async () => {
-    await fetch(`${API_BASE_URL}/api/logout`);
+    await fetch(`${API_BASE_URL}/api/logout`, { method: 'POST', credentials: 'include' });
     setUser(null);
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, isPending, isFetching, redirectToLogin, loginWithPassword, register, exchangeCodeForSessionToken, logout }}
+      value={{ user, isPending, isFetching, loginWithGoogle, loginWithPassword, register, exchangeCodeForSessionToken, logout }}
     >
       {children}
     </AuthContext.Provider>

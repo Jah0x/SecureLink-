@@ -3,7 +3,7 @@ import { Shield, Lock, Globe, Zap } from 'lucide-react';
 import { useState } from 'react';
 
 export default function LoginScreen() {
-  const { redirectToLogin, loginWithPassword, isFetching } = useAuth();
+  const { loginWithGoogle, loginWithPassword, isFetching } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -66,7 +66,7 @@ export default function LoginScreen() {
           </form>
 
           <button
-            onClick={redirectToLogin}
+            onClick={loginWithGoogle}
             disabled={isFetching}
             className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-blue-500/20"
           >

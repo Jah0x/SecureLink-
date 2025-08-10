@@ -8,6 +8,7 @@ export default defineConfig({
   server: {
     allowedHosts: true,
   },
+  // Поддерживаем переменные окружения Vite и Next-подобные
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   build: {
     chunkSizeWarningLimit: 5000,

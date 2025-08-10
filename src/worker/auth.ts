@@ -1,6 +1,8 @@
 import { MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 
+declare const process: { env: Record<string, string | undefined> };
+
 export const HUNKO_SESSION_TOKEN_COOKIE_NAME = 'hunko_session_token';
 
 export function getOAuthRedirectUrl(
@@ -8,19 +10,22 @@ export function getOAuthRedirectUrl(
   dashboardUrl?: string,
   redirectFromQuery?: string
 ) {
-  const base = redirectFromQuery
-    ? undefined
-    : (dashboardUrl || process.env.NEXT_PUBLIC_API_BASE_URL || "");
-  const dashboard = base && /^https?:\/\//.test(base)
-    ? base
-    : "https://dashboard.zerologsvpn.com";
+  const dashboardOrigin =
+    dashboardUrl ||
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    "https://dashboard.zerologsvpn.com";
 
-  const redirect =
-    redirectFromQuery || new URL("/thirdparty/callback", dashboard).toString();
+  let redirect: string;
+  try {
+    redirect = redirectFromQuery
+      ? new URL(redirectFromQuery).toString()
+      : new URL("/thirdparty/callback", dashboardOrigin).toString();
+  } catch {
+    redirect = "https://dashboard.zerologsvpn.com/thirdparty/callback";
+  }
 
   const hankoBase =
     process.env.HUNKO_USERS_SERVICE_API_URL ||
-    process.env.NEXT_PUBLIC_HANKO_API_URL ||
     "http://hanko-public.securelink.svc.cluster.local";
 
   const u = new URL("/thirdparty/authorisationurl", hankoBase);

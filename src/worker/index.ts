@@ -3,7 +3,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import {
-  exchangeCodeForSessionToken,
   getOAuthRedirectUrl,
   authMiddleware,
   deleteSession,
@@ -82,136 +81,167 @@ async function syncUserWithMarzban(env: Env, vpnUser: any, subscription: any) {
 
 // Auth routes
 app.get('/auth/authorisationurl', (c) => {
-  const provider = c.req.query('provider');
-  const redirect = c.req.query('redirect_url') || undefined;
-  const host = c.req.header('host');
-  const proto = c.req.header('x-forwarded-proto') || 'http';
-  const origin = host ? `${proto}://${host}` : undefined;
-
-  const url = getOAuthRedirectUrl(provider, origin, redirect);
-  return c.json({ redirectUrl: url });
+  try {
+    const provider = c.req.query('provider') || 'google';
+    const redirect = c.req.query('redirect_url') || undefined;
+    const host = c.req.header('host');
+    const proto = c.req.header('x-forwarded-proto') || 'http';
+    const origin = host ? `${proto}://${host}` : undefined;
+    const url = getOAuthRedirectUrl(provider, origin, redirect);
+    return c.json({ redirectUrl: url });
+  } catch (e) {
+    console.error('authorisationurl error:', e);
+    return c.json({ error: 'Failed to build redirect URL' }, 500);
+  }
 });
 
 app.get('/thirdparty/:provider/redirect_url', (c) => {
-  const provider = c.req.param('provider');
-  const redirect = c.req.query('redirect_url') || undefined;
-  const host = c.req.header('host');
-  const proto = c.req.header('x-forwarded-proto') || 'http';
-  const origin = host ? `${proto}://${host}` : undefined;
-
-  const url = getOAuthRedirectUrl(provider, origin, redirect);
-  return c.json({ redirectUrl: url });
-});
-
-app.get('/api/oauth/google/redirect_url', (c) => {
-  const redirect = c.req.query('redirect_url') || undefined;
-  const host = c.req.header('host');
-  const proto = c.req.header('x-forwarded-proto') || 'http';
-  const origin = host ? `${proto}://${host}` : undefined;
-
-  const url = getOAuthRedirectUrl('google', origin, redirect);
-  return c.json({ redirectUrl: url });
+  try {
+    const provider = c.req.param('provider');
+    const redirect = c.req.query('redirect_url') || undefined;
+    const host = c.req.header('host');
+    const proto = c.req.header('x-forwarded-proto') || 'http';
+    const origin = host ? `${proto}://${host}` : undefined;
+    const url = getOAuthRedirectUrl(provider, origin, redirect);
+    return c.json({ redirectUrl: url });
+  } catch (e) {
+    console.error('/thirdparty redirect_url error:', e);
+    return c.json({ error: 'Failed to build redirect URL' }, 500);
+  }
 });
 
 app.post("/api/sessions", zValidator("json", z.object({ code: z.string() })), async (c) => {
-  const { code } = c.req.valid("json");
-
-  const sessionToken = await exchangeCodeForSessionToken(code, {
-    apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
-    apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
-  });
-
-  setCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME, sessionToken, {
-    httpOnly: true,
-    path: "/",
-    sameSite: "none",
-    secure: true,
-    maxAge: 60 * 24 * 60 * 60, // 60 days
-  });
-
-  return c.json({ success: true }, 200);
-});
-
-app.post('/api/password/register', async (c) => {
-  const body = await c.req.json();
-  const res = await fetch(`${c.env.HUNKO_USERS_SERVICE_API_URL}/password/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': c.env.HUNKO_USERS_SERVICE_API_KEY },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    return c.json({ error: 'Registration failed' }, res.status);
-  }
-  return c.json({ success: true }, 200);
-});
-
-app.post('/api/password/login', async (c) => {
-  const body = await c.req.json();
-  const res = await fetch(`${c.env.HUNKO_USERS_SERVICE_API_URL}/password/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': c.env.HUNKO_USERS_SERVICE_API_KEY },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    return c.json({ error: 'Login failed' }, res.status);
-  }
-  const data = await res.json();
-  setCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME, data.sessionToken || data.token, {
-    httpOnly: true,
-    path: '/',
-    sameSite: 'none',
-    secure: true,
-    maxAge: 60 * 24 * 60 * 60,
-  });
-  return c.json({ success: true }, 200);
-});
-
-app.get("/api/users/me", authMiddleware, async (c) => {
-  const hunkoUser = c.get("user");
-  
-  if (!hunkoUser) {
-    return c.json({ error: "User not found" }, 401);
-  }
-  
-  // Get or create VPN user record
-  let vpnUser = await c.env.DB.prepare(
-    "SELECT * FROM vpn_users WHERE hunko_user_id = ?"
-  ).bind(hunkoUser.id).first();
-
-  if (!vpnUser) {
-    // Create new VPN user
-    const result = await c.env.DB.prepare(
-      `INSERT INTO vpn_users (hunko_user_id, email, username, created_at, updated_at) 
-       VALUES (?, ?, ?, datetime('now'), datetime('now'))`
-    ).bind(hunkoUser.id, hunkoUser.email, hunkoUser.google_user_data.name || null).run();
-
-    vpnUser = await c.env.DB.prepare(
-      "SELECT * FROM vpn_users WHERE id = ?"
-    ).bind(result.meta.last_row_id).first();
-  }
-
-  return c.json({ hunkoUser, vpnUser });
-});
-
-app.get('/api/logout', async (c) => {
-  const sessionToken = getCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME);
-
-  if (typeof sessionToken === 'string') {
-    await deleteSession(sessionToken, {
-      apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
-      apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
+  try {
+    const { code } = c.req.valid("json");
+    const res = await fetch(`${c.env.HUNKO_USERS_SERVICE_API_URL}/sessions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': c.env.HUNKO_USERS_SERVICE_API_KEY,
+      },
+      body: JSON.stringify({ code }),
     });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('/api/sessions Hanko error:', res.status, text);
+      return c.json({ error: 'Failed to exchange code' }, res.status);
+    }
+    const data = await res.json();
+    const token = data.sessionToken || data.token;
+    setCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME, token, {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'lax',
+      secure: (c.req.header('x-forwarded-proto') || 'http') === 'https',
+      maxAge: data.expiresIn || 60 * 24 * 60 * 60,
+    });
+    return c.json({ user: data.user });
+  } catch (e) {
+    console.error('/api/sessions error:', e);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+app.post('/api/auth/register', async (c) => {
+  try {
+    const body = await c.req.json();
+    const res = await fetch(`${c.env.HUNKO_USERS_SERVICE_API_URL}/password/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': c.env.HUNKO_USERS_SERVICE_API_KEY,
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('/api/auth/register Hanko error:', res.status, text);
+      return c.json({ error: 'Registration failed' }, res.status);
+    }
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('/api/auth/register error:', e);
+    return c.json({ error: 'Registration failed' }, 500);
+  }
+});
+
+app.post('/api/auth/login', async (c) => {
+  try {
+    const body = await c.req.json();
+    const res = await fetch(`${c.env.HUNKO_USERS_SERVICE_API_URL}/password/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': c.env.HUNKO_USERS_SERVICE_API_KEY,
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('/api/auth/login Hanko error:', res.status, text);
+      return c.json({ error: 'Login failed' }, res.status);
+    }
+    const data = await res.json();
+    setCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME, data.sessionToken || data.token, {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'lax',
+      secure: (c.req.header('x-forwarded-proto') || 'http') === 'https',
+      maxAge: 60 * 24 * 60 * 60,
+    });
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('/api/auth/login error:', e);
+    return c.json({ error: 'Login failed' }, 500);
+  }
+});
+
+app.get("/api/users/me", async (c) => {
+  const token = getCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME);
+  if (!token) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  try {
+    const res = await fetch(`${c.env.HUNKO_USERS_SERVICE_API_URL}/users/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-api-key': c.env.HUNKO_USERS_SERVICE_API_KEY,
+      },
+    });
+    if (!res.ok) {
+      console.error('/api/users/me Hanko error:', res.status);
+      return c.json({ error: 'Unauthorized' }, res.status);
+    }
+    const user = await res.json();
+    return c.json(user);
+  } catch (e) {
+    console.error('/api/users/me error:', e);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+app.post('/api/logout', async (c) => {
+  const sessionToken = getCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME);
+  if (typeof sessionToken === 'string') {
+    try {
+      await deleteSession(sessionToken, {
+        apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
+        apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
+      });
+    } catch (e) {
+      console.error('/api/logout Hanko error:', e);
+    }
   }
 
   setCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME, '', {
     httpOnly: true,
     path: '/',
-    sameSite: 'none',
-    secure: true,
+    sameSite: 'lax',
+    secure: (c.req.header('x-forwarded-proto') || 'http') === 'https',
     maxAge: 0,
   });
 
-  return c.json({ success: true }, 200);
+  return c.json({ success: true });
 });
 
 // Health checks

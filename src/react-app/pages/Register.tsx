@@ -11,8 +11,10 @@ export default function Register() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirm) return;
-    await register(email, password);
-    window.location.href = '/';
+    const ok = await register(email, password);
+    if (ok) {
+      window.location.href = '/';
+    }
   };
 
   return (
