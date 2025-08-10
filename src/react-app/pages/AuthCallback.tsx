@@ -9,12 +9,15 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const redirectTo = params.get('redirectTo') || params.get('redirect_to') || '/';
       try {
         await exchangeCodeForSessionToken();
-        navigate('/dashboard');
+        navigate(redirectTo);
       } catch (error) {
         console.error('Auth callback error:', error);
-        navigate('/');
+        alert('Ошибка авторизации');
+        navigate('/auth');
       }
     };
 
