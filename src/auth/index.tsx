@@ -30,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const API_BASE_URL = import.meta.env.NEXT_PUBLIC_API_BASE_URL || '';
   const [user, setUser] = useState<User | null>(null);
   const [isPending, setPending] = useState(true);
   const [isFetching, setFetching] = useState(false);
@@ -37,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/users/me');
+        const res = await fetch(`${API_BASE_URL}/api/users/me`);
         if (res.ok) {
           const data: User = await res.json();
           setUser(data);
@@ -51,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const redirectToLogin = async () => {
     setFetching(true);
     try {
-      const res = await fetch('/api/oauth/google/redirect_url');
+      const res = await fetch(`${API_BASE_URL}/api/oauth/google/redirect_url`);
       const data = await res.json();
       window.location.href = data.redirectUrl;
     } finally {
@@ -63,19 +64,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (!code) throw new Error('Code not provided');
-    await fetch('/api/sessions', {
+    await fetch(`${API_BASE_URL}/api/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
     });
-    const res = await fetch('/api/users/me');
+    const res = await fetch(`${API_BASE_URL}/api/users/me`);
     if (res.ok) {
       setUser((await res.json()) as User);
     }
   };
 
   const logout = async () => {
-    await fetch('/api/logout');
+    await fetch(`${API_BASE_URL}/api/logout`);
     setUser(null);
   };
 

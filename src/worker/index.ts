@@ -81,6 +81,24 @@ async function syncUserWithMarzban(env: Env, vpnUser: any, subscription: any) {
 }
 
 // Auth routes
+app.get('/auth/authorisationurl', async (c) => {
+  const provider = c.req.query('provider') || 'google';
+  const redirectUrl = await getOAuthRedirectUrl(provider, {
+    apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
+    apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
+  });
+  return c.json({ redirectUrl }, 200);
+});
+
+app.get('/thirdparty/:provider/redirect_url', async (c) => {
+  const { provider } = c.req.param();
+  const redirectUrl = await getOAuthRedirectUrl(provider, {
+    apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
+    apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
+  });
+  return c.json({ redirectUrl }, 200);
+});
+
 app.get('/api/oauth/google/redirect_url', async (c) => {
   const redirectUrl = await getOAuthRedirectUrl('google', {
     apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
@@ -156,6 +174,10 @@ app.get('/api/logout', async (c) => {
 
   return c.json({ success: true }, 200);
 });
+
+// Health checks
+app.get('/healthz', (c) => c.json({ status: 'ok' }));
+app.get('/', (c) => c.json({ status: 'ok' }));
 
 // VPN API routes
 app.get("/api/dashboard/stats", authMiddleware, async (c) => {
