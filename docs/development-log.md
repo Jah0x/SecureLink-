@@ -12,3 +12,5 @@
 - В `AuthProvider` вынесен базовый URL API в переменную `NEXT_PUBLIC_API_BASE_URL`.
 - Настроен `vite.config.ts` для поддержки `NEXT_PUBLIC_*` переменных.
 - Исправлено формирование OAuth URL: теперь используется `/thirdparty/authorisationurl` с передачей `redirectURIOnProviderDashboard`, что корректно перенаправляет пользователя после входа через Google.
+- Добавлен фолбэк для `getOAuthRedirectUrl` с поддержкой параметра `redirect_url` и внутренних адресов Hanko, что убирает ошибку `Invalid URL string`.
+- Реализована авторизация по email и паролю, добавлена страница регистрации в том же дизайне, что и страница входа.

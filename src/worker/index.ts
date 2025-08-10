@@ -81,34 +81,36 @@ async function syncUserWithMarzban(env: Env, vpnUser: any, subscription: any) {
 }
 
 // Auth routes
-app.get('/auth/authorisationurl', async (c) => {
-  const provider = c.req.query('provider') || 'google';
-  const redirectUrl = await getOAuthRedirectUrl(provider, {
-    apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
-    apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
-    dashboardUrl: new URL(c.req.url).origin,
-  });
-  return c.json({ redirectUrl }, 200);
+app.get('/auth/authorisationurl', (c) => {
+  const provider = c.req.query('provider');
+  const redirect = c.req.query('redirect_url') || undefined;
+  const host = c.req.header('host');
+  const proto = c.req.header('x-forwarded-proto') || 'http';
+  const origin = host ? `${proto}://${host}` : undefined;
+
+  const url = getOAuthRedirectUrl(provider, origin, redirect);
+  return c.json({ redirectUrl: url });
 });
 
-app.get('/thirdparty/:provider/redirect_url', async (c) => {
-  const { provider } = c.req.param();
-  const redirectUrl = await getOAuthRedirectUrl(provider, {
-    apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
-    apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
-    dashboardUrl: new URL(c.req.url).origin,
-  });
-  return c.json({ redirectUrl }, 200);
+app.get('/thirdparty/:provider/redirect_url', (c) => {
+  const provider = c.req.param('provider');
+  const redirect = c.req.query('redirect_url') || undefined;
+  const host = c.req.header('host');
+  const proto = c.req.header('x-forwarded-proto') || 'http';
+  const origin = host ? `${proto}://${host}` : undefined;
+
+  const url = getOAuthRedirectUrl(provider, origin, redirect);
+  return c.json({ redirectUrl: url });
 });
 
-app.get('/api/oauth/google/redirect_url', async (c) => {
-  const redirectUrl = await getOAuthRedirectUrl('google', {
-    apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
-    apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
-    dashboardUrl: new URL(c.req.url).origin,
-  });
+app.get('/api/oauth/google/redirect_url', (c) => {
+  const redirect = c.req.query('redirect_url') || undefined;
+  const host = c.req.header('host');
+  const proto = c.req.header('x-forwarded-proto') || 'http';
+  const origin = host ? `${proto}://${host}` : undefined;
 
-  return c.json({ redirectUrl }, 200);
+  const url = getOAuthRedirectUrl('google', origin, redirect);
+  return c.json({ redirectUrl: url });
 });
 
 app.post("/api/sessions", zValidator("json", z.object({ code: z.string() })), async (c) => {
@@ -127,6 +129,40 @@ app.post("/api/sessions", zValidator("json", z.object({ code: z.string() })), as
     maxAge: 60 * 24 * 60 * 60, // 60 days
   });
 
+  return c.json({ success: true }, 200);
+});
+
+app.post('/api/password/register', async (c) => {
+  const body = await c.req.json();
+  const res = await fetch(`${c.env.HUNKO_USERS_SERVICE_API_URL}/password/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': c.env.HUNKO_USERS_SERVICE_API_KEY },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    return c.json({ error: 'Registration failed' }, res.status);
+  }
+  return c.json({ success: true }, 200);
+});
+
+app.post('/api/password/login', async (c) => {
+  const body = await c.req.json();
+  const res = await fetch(`${c.env.HUNKO_USERS_SERVICE_API_URL}/password/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': c.env.HUNKO_USERS_SERVICE_API_KEY },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    return c.json({ error: 'Login failed' }, res.status);
+  }
+  const data = await res.json();
+  setCookie(c, HUNKO_SESSION_TOKEN_COOKIE_NAME, data.sessionToken || data.token, {
+    httpOnly: true,
+    path: '/',
+    sameSite: 'none',
+    secure: true,
+    maxAge: 60 * 24 * 60 * 60,
+  });
   return c.json({ success: true }, 200);
 });
 
