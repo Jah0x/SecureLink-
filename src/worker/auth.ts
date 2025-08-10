@@ -3,8 +3,18 @@ import { getCookie } from 'hono/cookie';
 
 export const HUNKO_SESSION_TOKEN_COOKIE_NAME = 'hunko_session_token';
 
-export async function getOAuthRedirectUrl(provider: string, opts: { apiUrl: string; apiKey: string; }) {
-  const res = await fetch(`${opts.apiUrl}/oauth/${provider}/redirect_url`, {
+export async function getOAuthRedirectUrl(
+  provider: string,
+  opts: { apiUrl: string; apiKey: string; dashboardUrl: string }
+) {
+  const url = new URL(`${opts.apiUrl}/thirdparty/authorisationurl`);
+  url.searchParams.set('thirdPartyId', provider);
+  url.searchParams.set(
+    'redirectURIOnProviderDashboard',
+    `${opts.dashboardUrl}/auth/callback`
+  );
+
+  const res = await fetch(url.toString(), {
     headers: { 'x-api-key': opts.apiKey },
   });
   if (!res.ok) throw new Error('Failed to get redirect URL');
