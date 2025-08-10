@@ -26,11 +26,19 @@ npm run dev
 
 - `HUNKO_USERS_SERVICE_API_URL` – внутренний адрес сервиса аутентификации Hunko
 - `HUNKO_USERS_SERVICE_API_KEY` – ключ доступа к сервису аутентификации
+- `HUNKO_SESSION_TOKEN_COOKIE_NAME` – имя HttpOnly‑куки сессии
 - `NEXT_PUBLIC_API_BASE_URL` – базовый URL API (обычно `https://dashboard.zerologsvpn.com`)
 - `NEXT_PUBLIC_HANKO_API_URL` – публичный URL сервиса Hanko (тот же домен, что и фронтенд)
 
 Проект ожидает, что в каталоге `public/` будут размещены локальные иконки и изображения для Open Graph.
 Из-за политики репозитория бинарные файлы не хранятся в Git, поэтому добавьте собственные изображения перед деплоем.
+
+## Как это работает на одном домене
+
+Все запросы приходят на `https://dashboard.zerologsvpn.com`. HAProxy направляет
+путь `/thirdparty/callback` в публичное API Hanko, а остальные — в это приложение
+(Vite + Hono). Благодаря единому домену HttpOnly‑куки сессии автоматически
+доступны как фронтенду, так и API, без дополнительных настроек CORS.
 
 ## Kubernetes
 
@@ -43,7 +51,7 @@ kubectl apply -f k8s/deployment.yaml
 В манифесте настроены liveness/readiness‑пробы на `GET /healthz` порта `5173`,
 Service типа `NodePort` пробрасывает порт `30082` на тот же порт контейнера.
 
-## Как проверить
+## Смоук‑тесты
 
 1. `curl -i http://<nodeIP>:30082/healthz` – должен вернуть 200.
 2. `curl -i "http://<nodeIP>:30082/thirdparty/google/redirect_url?redirect_url=https%3A%2F%2Fdashboard.zerologsvpn.com%2Fthirdparty%2Fcallback"` – в ответе JSON с полем `redirectUrl` на `accounts.google.com`.
