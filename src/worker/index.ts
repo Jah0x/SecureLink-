@@ -86,6 +86,7 @@ app.get('/auth/authorisationurl', async (c) => {
   const redirectUrl = await getOAuthRedirectUrl(provider, {
     apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
     apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
+    dashboardUrl: new URL(c.req.url).origin,
   });
   return c.json({ redirectUrl }, 200);
 });
@@ -95,6 +96,7 @@ app.get('/thirdparty/:provider/redirect_url', async (c) => {
   const redirectUrl = await getOAuthRedirectUrl(provider, {
     apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
     apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
+    dashboardUrl: new URL(c.req.url).origin,
   });
   return c.json({ redirectUrl }, 200);
 });
@@ -103,6 +105,7 @@ app.get('/api/oauth/google/redirect_url', async (c) => {
   const redirectUrl = await getOAuthRedirectUrl('google', {
     apiUrl: c.env.HUNKO_USERS_SERVICE_API_URL,
     apiKey: c.env.HUNKO_USERS_SERVICE_API_KEY,
+    dashboardUrl: new URL(c.req.url).origin,
   });
 
   return c.json({ redirectUrl }, 200);

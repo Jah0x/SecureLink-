@@ -11,3 +11,4 @@
 - Добавлены маршруты совместимости для OAuth (`/auth/authorisationurl`, `/thirdparty/:provider/redirect_url`) и health-check `/healthz`.
 - В `AuthProvider` вынесен базовый URL API в переменную `NEXT_PUBLIC_API_BASE_URL`.
 - Настроен `vite.config.ts` для поддержки `NEXT_PUBLIC_*` переменных.
+- Исправлено формирование OAuth URL: теперь используется `/thirdparty/authorisationurl` с передачей `redirectURIOnProviderDashboard`, что корректно перенаправляет пользователя после входа через Google.
