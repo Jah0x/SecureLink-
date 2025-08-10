@@ -9,6 +9,9 @@ npm install
 npm run dev
 ```
 
+Команда `npm run dev` одновременно стартует Hono API и Vite‑сервер на порту `5173`.
+Все запросы фронтенда направляются на тот же домен, поэтому куки сессии сохраняются корректно.
+
 ## Установка
 
 Запустите скрипт `install.sh`, который установит зависимости и подготовит окружение:
@@ -21,10 +24,10 @@ npm run dev
 
 Перед запуском задайте переменные окружения:
 
-- `HUNKO_USERS_SERVICE_API_URL` – адрес сервиса аутентификации Hunko
+- `HUNKO_USERS_SERVICE_API_URL` – внутренний адрес сервиса аутентификации Hunko
 - `HUNKO_USERS_SERVICE_API_KEY` – ключ доступа к сервису аутентификации
-- `NEXT_PUBLIC_API_BASE_URL` – базовый URL API, используется фронтендом
-- `NEXT_PUBLIC_HANKO_API_URL` – публичный URL сервиса Hanko
+- `NEXT_PUBLIC_API_BASE_URL` – базовый URL API (обычно `https://dashboard.zerologsvpn.com`)
+- `NEXT_PUBLIC_HANKO_API_URL` – публичный URL сервиса Hanko (тот же домен, что и фронтенд)
 
 Проект ожидает, что в каталоге `public/` будут размещены локальные иконки и изображения для Open Graph.
 Из-за политики репозитория бинарные файлы не хранятся в Git, поэтому добавьте собственные изображения перед деплоем.
@@ -36,6 +39,9 @@ npm run dev
 ```bash
 kubectl apply -f k8s/deployment.yaml
 ```
+
+В манифесте настроены liveness/readiness‑пробы на `GET /healthz` порта `5173`,
+Service типа `NodePort` пробрасывает порт `30082` на тот же порт контейнера.
 
 ## Как проверить
 

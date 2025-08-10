@@ -9,7 +9,9 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/worker": ["./src/worker/index.ts"],
+      "@/worker/*": ["./src/worker/*"]
     },
 
     /* Bundler mode */

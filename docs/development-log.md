@@ -17,3 +17,6 @@
 - Переработан OAuth‑флоу: теперь обмен кода на сессию идёт через `/api/sessions`, куки ставятся с `SameSite=Lax`, а `GET /api/users/me` обращается к Hanko.
 - Формы входа и регистрации используют `credentials: include`, показывают ошибки и спиннеры.
 - Dev-скрипт запускает одновременно API и Vite с помощью `concurrently`.
+- Добавлены алиасы TypeScript `@/worker` и обновлены `tsconfig` файлы.
+- Kubernetes-манифест теперь использует порт 5173 и проверку `/healthz` в liveness/readiness‑пробах.
+- Обновлены `.env.example` и `README.md` с описанием обязательных переменных и новых портов.

@@ -4,6 +4,8 @@ metadata:
   name: securelink
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: securelink
@@ -16,7 +18,7 @@ spec:
         - name: securelink
           image: securelink:latest
           ports:
-            - containerPort: 3000
+            - containerPort: 5173
           env:
             - name: HUNKO_USERS_SERVICE_API_URL
               value: "http://hunko-users:8000"
@@ -25,15 +27,33 @@ spec:
                 secretKeyRef:
                   name: securelink-secrets
                   key: hunkoApiKey
+            - name: NEXT_PUBLIC_API_BASE_URL
+              value: "https://dashboard.zerologsvpn.com"
+            - name: NEXT_PUBLIC_HANKO_API_URL
+              value: "https://dashboard.zerologsvpn.com"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 5173
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 5173
+            initialDelaySeconds: 10
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: securelink
 spec:
+  type: NodePort
   selector:
     app: securelink
   ports:
-    - port: 80
-      targetPort: 3000
+    - port: 5173
+      targetPort: 5173
+      nodePort: 30082
       protocol: TCP
