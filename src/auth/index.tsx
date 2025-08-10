@@ -16,6 +16,8 @@ interface AuthContextType {
   isPending: boolean;
   isFetching: boolean;
   redirectToLogin: () => Promise<void>;
+  loginWithPassword: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
   exchangeCodeForSessionToken: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -25,6 +27,8 @@ const AuthContext = createContext<AuthContextType>({
   isPending: true,
   isFetching: false,
   redirectToLogin: async () => {},
+  loginWithPassword: async () => {},
+  register: async () => {},
   exchangeCodeForSessionToken: async () => {},
   logout: async () => {},
 });
@@ -60,6 +64,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithPassword = async (email: string, password: string) => {
+    setFetching(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/password/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (res.ok) {
+        const me = await fetch(`${API_BASE_URL}/api/users/me`);
+        if (me.ok) {
+          setUser((await me.json()) as User);
+        }
+      }
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const register = async (email: string, password: string) => {
+    setFetching(true);
+    try {
+      await fetch(`${API_BASE_URL}/api/password/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+    } finally {
+      setFetching(false);
+    }
+  };
+
   const exchangeCodeForSessionToken = async () => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
@@ -82,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isPending, isFetching, redirectToLogin, exchangeCodeForSessionToken, logout }}
+      value={{ user, isPending, isFetching, redirectToLogin, loginWithPassword, register, exchangeCodeForSessionToken, logout }}
     >
       {children}
     </AuthContext.Provider>

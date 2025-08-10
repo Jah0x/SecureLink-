@@ -3,23 +3,30 @@ import { getCookie } from 'hono/cookie';
 
 export const HUNKO_SESSION_TOKEN_COOKIE_NAME = 'hunko_session_token';
 
-export async function getOAuthRedirectUrl(
+export function getOAuthRedirectUrl(
   provider: string,
-  opts: { apiUrl: string; apiKey: string; dashboardUrl: string }
+  dashboardUrl?: string,
+  redirectFromQuery?: string
 ) {
-  const url = new URL(`${opts.apiUrl}/thirdparty/authorisationurl`);
-  url.searchParams.set('thirdPartyId', provider);
-  url.searchParams.set(
-    'redirectURIOnProviderDashboard',
-    `${opts.dashboardUrl}/auth/callback`
-  );
+  const base = redirectFromQuery
+    ? undefined
+    : (dashboardUrl || process.env.NEXT_PUBLIC_API_BASE_URL || "");
+  const dashboard = base && /^https?:\/\//.test(base)
+    ? base
+    : "https://dashboard.zerologsvpn.com";
 
-  const res = await fetch(url.toString(), {
-    headers: { 'x-api-key': opts.apiKey },
-  });
-  if (!res.ok) throw new Error('Failed to get redirect URL');
-  const data = await res.json();
-  return data.redirectUrl || data.url;
+  const redirect =
+    redirectFromQuery || new URL("/thirdparty/callback", dashboard).toString();
+
+  const hankoBase =
+    process.env.HUNKO_USERS_SERVICE_API_URL ||
+    process.env.NEXT_PUBLIC_HANKO_API_URL ||
+    "http://hanko-public.securelink.svc.cluster.local";
+
+  const u = new URL("/thirdparty/authorisationurl", hankoBase);
+  u.searchParams.set("thirdPartyId", provider);
+  u.searchParams.set("redirectURIOnProviderDashboard", redirect);
+  return u.toString();
 }
 
 export async function exchangeCodeForSessionToken(code: string, opts: { apiUrl: string; apiKey: string; }) {
