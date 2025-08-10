@@ -5,7 +5,9 @@
     "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/worker": ["./src/worker/index.ts"],
+      "@/worker/*": ["./src/worker/*"]
     }
   },
   "include": ["src/worker"]
