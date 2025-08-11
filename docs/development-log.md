@@ -29,3 +29,4 @@
 - Фиксирован корневой маршрут: `GET /` всегда отдаёт HTML с корректным `Content-Type`, `HEAD /` проверяется смоук-тестом; `/healthz` возвращает JSON и сохранён SPA-фолбэк.
 - Добавлено автоопределение каталога сборки (`dist/client` или `dist`), единый SPA‑фолбэк и проверка `HEAD`‑заголовков.
 - Статика теперь раздаётся через `@hono/node-server/serve-static`, документация обновлена.
+- Добавлены прокси `/api/auth/register`, `/api/auth/login`, `/api/auth/logout` и `/api/users/me` к сервису AUTH с установкой HttpOnly-куки на `.zerologsvpn.com`; реализован OAuth helper `/thirdparty/:provider/redirect_url`; обновлён `.env.example` с настройками куки и путей AUTH; README дополнен инструкциями по проверкам `npm run build && npm run smoke:head`.
