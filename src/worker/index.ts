@@ -20,6 +20,7 @@ import {
   gbToBytes 
 } from "@/shared/marzban";
 import "./types";
+import fs from 'node:fs/promises';
 
 
 const app = new Hono<{ Bindings: Env }>();
@@ -1203,7 +1204,10 @@ app.get("/api/admin/partner-stats", authMiddleware, async (c) => {
 app.use('/assets/*', serveStatic({ root: './dist/client' }));
 
 // SPA entry
-app.get('/', serveStatic({ path: './dist/client/index.html' }));
+app.get('/', async (c) => {
+  const html = await fs.readFile('./dist/client/index.html', 'utf8');
+  return c.html(html);
+});
 
 // SPA fallback
 app.get('*', serveStatic({ path: './dist/client/index.html' }));
