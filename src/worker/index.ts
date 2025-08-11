@@ -21,6 +21,7 @@ import {
 } from "@/shared/marzban";
 import "./types";
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 
 
 const app = new Hono<{ Bindings: Env }>();
@@ -1200,16 +1201,18 @@ app.get("/api/admin/partner-stats", authMiddleware, async (c) => {
   });
 });
 
-// Static assets
-app.use('/assets/*', serveStatic({ root: './dist/client' }));
+// ---- autodetect build dir (prefer ./dist/client, fallback ./dist) ----
+const hasClient = fsSync.existsSync('./dist/client/index.html');
+const ASSETS_ROOT = hasClient ? './dist/client' : './dist';
+const INDEX_PATH = hasClient ? './dist/client/index.html' : './dist/index.html';
 
-// SPA entry
-app.get('/', async (c) => {
-  const html = await fs.readFile('./dist/client/index.html', 'utf8');
-  return c.html(html);
-});
+// ассеты
+app.use('/assets/*', serveStatic({ root: ASSETS_ROOT }));
 
-// SPA fallback
-app.get('*', serveStatic({ path: './dist/client/index.html' }));
+// корень всегда HTML (правильный content-type даже на HEAD)
+app.get('/', async (c) => c.html(await fs.readFile(INDEX_PATH, 'utf8')));
+
+// SPA fallback — последним
+app.get('*', serveStatic({ path: INDEX_PATH }));
 
 export default app;
