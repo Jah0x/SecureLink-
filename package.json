@@ -38,6 +38,7 @@
     "cf-typegen": "wrangler types",
     "check": "tsc && vite build && wrangler deploy --dry-run",
     "dev": "concurrently -k \"tsx src/worker/index.ts\" \"vite --host 0.0.0.0 --port 5173\"",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "smoke:head": "tsx scripts/smoke-head.ts"
   }
 }
