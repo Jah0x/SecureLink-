@@ -1,6 +1,7 @@
 /* eslint-disable */
 // @ts-nocheck
 import { Hono } from "hono";
+import { serveStatic } from "hono/serve-static";
 import { zValidator } from "@hono/zod-validator";
 import {
   getOAuthRedirectUrl,
@@ -226,7 +227,6 @@ app.post('/api/logout', async (c) => {
 
 // Health checks
 app.get('/healthz', (c) => c.json({ status: 'ok' }));
-app.get('/', (c) => c.json({ status: 'ok' }));
 
 // VPN API routes
 app.get("/api/dashboard/stats", authMiddleware, async (c) => {
@@ -1198,5 +1198,14 @@ app.get("/api/admin/partner-stats", authMiddleware, async (c) => {
     total_referrals: totalReferrals?.count || 0
   });
 });
+
+// Static assets
+app.use('/assets/*', serveStatic({ root: './dist/client' }));
+
+// SPA entry
+app.get('/', serveStatic({ path: './dist/client/index.html' }));
+
+// SPA fallback
+app.get('*', serveStatic({ path: './dist/client/index.html' }));
 
 export default app;
