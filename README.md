@@ -1,6 +1,6 @@
 # SecureLink VPN
 
-Проект обеспечивает личный кабинет для управления VPN-сервисом. Аутентификация выполняется через собственный сервер Hunko. Статические файлы обслуживаются через `@hono/node-server/serve-static`.
+Проект обеспечивает личный кабинет для управления VPN-сервисом. Аутентификация выполняется через собственный сервер Hunko. Статические файлы обслуживаются через `@hono/node-server/serve-static`. Реализованы помощник OAuth `GET /thirdparty/:provider/redirect_url` и прокси-маршруты `/api/auth/*`, `/api/users/me`, которые устанавливают HttpOnly-куку сессии на домен `.zerologsvpn.com`.
 
 ## Запуск в разработке
 
@@ -30,9 +30,24 @@ npm run build && npm run smoke:head
 
 Перед запуском задайте переменные окружения:
 
-- `HUNKO_USERS_SERVICE_API_URL` – внутренний адрес сервиса аутентификации Hunko
+- `HUNKO_USERS_SERVICE_API_URL` – базовый URL сервиса аутентификации Hunko
 - `HUNKO_USERS_SERVICE_API_KEY` – ключ доступа к сервису аутентификации
-- `HUNKO_SESSION_TOKEN_COOKIE_NAME` – имя HttpOnly‑куки сессии
+
+### Cookie settings
+- `SESSION_COOKIE_NAME` – имя HttpOnly‑куки сессии
+- `SESSION_COOKIE_DOMAIN` – домен для установки куки (обычно `.zerologsvpn.com`)
+- `SESSION_COOKIE_SECURE` – флаг `Secure`
+- `SESSION_COOKIE_SAMESITE` – политика `SameSite`
+- `SESSION_COOKIE_MAXAGE` – время жизни куки в секундах
+
+### AUTH endpoints
+- `AUTH_PATH_AUTHORISATION_URL` – путь до `authorisationurl`
+- `AUTH_PATH_REGISTER` – путь регистрации
+- `AUTH_PATH_LOGIN` – путь входа
+- `AUTH_PATH_ME` – путь профиля пользователя
+- `AUTH_PATH_LOGOUT` – путь выхода
+
+### Frontend config
 - `NEXT_PUBLIC_API_BASE_URL` – базовый URL API (обычно `https://dashboard.zerologsvpn.com`)
 - `NEXT_PUBLIC_HANKO_API_URL` – публичный URL сервиса Hanko (тот же домен, что и фронтенд)
 
@@ -61,10 +76,10 @@ Service типа `NodePort` пробрасывает порт `30082` на то�
 
 1. `curl -i http://<nodeIP>:30082/healthz` – должен вернуть 200.
 2. `curl -i "http://<nodeIP>:30082/thirdparty/google/redirect_url?redirect_url=https%3A%2F%2Fdashboard.zerologsvpn.com%2Fthirdparty%2Fcallback"` – в ответе JSON с полем `redirectUrl` на `accounts.google.com`.
-3. `curl -i "https://dashboard.zerologsvpn.com/thirdparty/google/redirect_url?redirect_url=https%3A%2F%2Fdashboard.zerologsvpn.com%2Fthirdparty%2Fcallback"` – то же самое через HAProxy.
-4. После получения кода от Google отправить `POST https://dashboard.zerologsvpn.com/api/sessions` с `{ "code": "<полученный код>" }`, затем `GET https://dashboard.zerologsvpn.com/api/users/me` – должен вернуть 200 и данные пользователя.
+3. `curl -i -X POST http://<nodeIP>:30082/api/auth/login -d '{"email":"user@example.com","password":"pass"}' -H 'Content-Type: application/json'` – при успехе устанавливается кука `hunko_session_token`.
+4. `curl -i --cookie "hunko_session_token=<token>" http://<nodeIP>:30082/api/users/me` – должен вернуть 200 и данные пользователя.
 
-Логи приложения выводятся в STDOUT, ошибки маршрутов `/thirdparty/*` и `/api/sessions` снабжены подробными сообщениями.
+Логи приложения выводятся в STDOUT, ошибки маршрутов снабжены подробными сообщениями.
 
 ## Логи разработки
 
