@@ -1,7 +1,7 @@
 /* eslint-disable */
 // @ts-nocheck
 import { Hono } from "hono";
-import { serveStatic } from "hono/serve-static";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { zValidator } from "@hono/zod-validator";
 import {
   getOAuthRedirectUrl,
