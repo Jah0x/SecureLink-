@@ -96,7 +96,7 @@ export default function Header() {
               
               <div className="flex items-center space-x-2 text-slate-300">
                 <User className="w-4 h-4" />
-                <span className="text-sm">{user?.google_user_data?.name || user?.email || ''}</span>
+                <span className="text-sm">{user?.email || ''}</span>
               </div>
               <button
                 onClick={logout}

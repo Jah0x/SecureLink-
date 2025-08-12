@@ -1,7 +1,7 @@
 
 CREATE TABLE vpn_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  hunko_user_id TEXT NOT NULL UNIQUE,
+  auth_user_id TEXT NOT NULL UNIQUE,
   username TEXT,
   email TEXT NOT NULL,
   is_active BOOLEAN DEFAULT TRUE,
