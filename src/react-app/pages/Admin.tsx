@@ -5,7 +5,7 @@ import Header from '@/react-app/components/Header';
 import PlanModal from '@/react-app/components/PlanModal';
 import GiveSubscriptionModal from '@/react-app/components/GiveSubscriptionModal';
 import PartnerLevelsModal from '@/react-app/components/PartnerLevelsModal';
-import { Users, Settings, CreditCard, Plus, Edit, Trash2, Gift, RefreshCw, Server, DollarSign, TrendingUp } from 'lucide-react';
+import { Users, Settings, CreditCard, Plus, Edit, Gift, RefreshCw, Server, DollarSign, TrendingUp, Check, Ban } from 'lucide-react';
 import MarzbanStatsCard from '@/react-app/components/MarzbanStatsCard';
 
 interface VpnPlan {
@@ -16,6 +16,7 @@ interface VpnPlan {
   traffic_limit_gb: number | null;
   features: string[];
   is_active: boolean;
+  created_at: string;
 }
 
 interface VpnPlanForm {
@@ -49,6 +50,10 @@ interface PartnerStats {
   total_referrals: number;
 }
 
+interface IntegrationsWindow extends Window {
+  __INTEGRATIONS?: { marzban?: { enabled?: boolean } };
+}
+
 export default function Admin() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -56,6 +61,7 @@ export default function Admin() {
   const [syncing, setSyncing] = useState(false);
   const [users, setUsers] = useState<VpnUserInfo[]>([]);
   const [plans, setPlans] = useState<VpnPlan[]>([]);
+  const [planFilter, setPlanFilter] = useState<'all' | '1' | '0'>('all');
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   
@@ -66,6 +72,7 @@ export default function Admin() {
   const [selectedUser, setSelectedUser] = useState<{ id: number; email: string } | null>(null);
   const [showPartnerLevelsModal, setShowPartnerLevelsModal] = useState(false);
   const [partnerStats, setPartnerStats] = useState<PartnerStats | null>(null);
+  const marzbanEnabled = (window as IntegrationsWindow).__INTEGRATIONS?.marzban?.enabled === true;
 
   useEffect(() => {
     if (!user) {
@@ -83,11 +90,17 @@ export default function Admin() {
     })();
   }, [user, navigate]);
 
+  useEffect(() => {
+    if (isAdmin) {
+      fetchData();
+    }
+  }, [planFilter, isAdmin]);
+
   const fetchData = async () => {
     try {
       const [usersRes, plansRes, partnerStatsRes] = await Promise.all([
         fetch('/api/admin/users'),
-        fetch('/api/admin/plans'),
+        fetch(`/api/admin/plans?active=${planFilter}`),
         fetch('/api/admin/partner-stats')
       ]);
 
@@ -146,24 +159,26 @@ export default function Admin() {
     }
   };
 
-  const handleDeletePlan = async (planId: number) => {
-    if (!confirm('Вы уверены, что хотите удалить этот план?')) {
-      return;
-    }
-
+  const handleDeactivatePlan = async (planId: number) => {
+    if (!confirm('Отключить этот план?')) return;
     try {
-      const response = await fetch(`/api/admin/plans/${planId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        await fetchData();
-      } else {
-        alert('Ошибка при удалении плана');
-      }
+      const response = await fetch(`/api/admin/plans/${planId}`, { method: 'DELETE' });
+      if (response.ok) await fetchData();
+      else alert('Ошибка при отключении плана');
     } catch (error) {
-      console.error('Failed to delete plan:', error);
-      alert('Ошибка при удалении плана');
+      console.error('Failed to deactivate plan:', error);
+      alert('Ошибка при отключении плана');
+    }
+  };
+
+  const handleActivatePlan = async (planId: number) => {
+    try {
+      const response = await fetch(`/api/admin/plans/${planId}/activate`, { method: 'POST' });
+      if (response.ok) await fetchData();
+      else alert('Ошибка при активации плана');
+    } catch (error) {
+      console.error('Failed to activate plan:', error);
+      alert('Ошибка при активации плана');
     }
   };
 
@@ -192,6 +207,10 @@ export default function Admin() {
   };
 
   const handleSyncMarzban = async () => {
+    if (!marzbanEnabled) {
+      alert('Интеграция отключена');
+      return;
+    }
     setSyncing(true);
     try {
       const response = await fetch('/api/admin/marzban/sync', {
@@ -410,27 +429,38 @@ export default function Admin() {
               <h2 className="text-xl font-semibold text-white">
                 Тарифные планы ({plans.length})
               </h2>
-              <button
-                onClick={() => {
-                  setEditingPlan(null);
-                  setShowPlanModal(true);
-                }}
-                className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Добавить план</span>
-              </button>
+              <div className="flex items-center space-x-4">
+                <select
+                  value={planFilter}
+                  onChange={(e) => setPlanFilter(e.target.value as 'all' | '1' | '0')}
+                  className="bg-slate-700 border border-slate-600 text-slate-200 rounded-lg px-3 py-2"
+                >
+                  <option value="all">Все</option>
+                  <option value="1">Активные</option>
+                  <option value="0">Неактивные</option>
+                </select>
+                <button
+                  onClick={() => {
+                    setEditingPlan(null);
+                    setShowPlanModal(true);
+                  }}
+                  className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Добавить план</span>
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-700">
                     <th className="text-left p-4 text-slate-300 font-medium">Название</th>
-                    <th className="text-left p-4 text-slate-300 font-medium">Период (дней)</th>
                     <th className="text-left p-4 text-slate-300 font-medium">Цена</th>
+                    <th className="text-left p-4 text-slate-300 font-medium">Период (дней)</th>
                     <th className="text-left p-4 text-slate-300 font-medium">Трафик</th>
-                    <th className="text-left p-4 text-slate-300 font-medium">Фичи</th>
                     <th className="text-left p-4 text-slate-300 font-medium">Статус</th>
+                    <th className="text-left p-4 text-slate-300 font-medium">Создан</th>
                     <th className="text-left p-4 text-slate-300 font-medium">Действия</th>
                   </tr>
                 </thead>
@@ -441,26 +471,24 @@ export default function Admin() {
                         <div className="text-white font-medium">{plan.name}</div>
                       </td>
                       <td className="p-4 text-slate-300">
-                        {plan.period_days}
+                        {formatPrice(plan.price_cents)}
                       </td>
                       <td className="p-4 text-slate-300">
-                        {formatPrice(plan.price_cents)}
+                        {plan.period_days}
                       </td>
                       <td className="p-4 text-slate-300">
                         {plan.traffic_limit_gb ? `${plan.traffic_limit_gb} ГБ` : 'Безлимит'}
                       </td>
-                      <td className="p-4 text-slate-300">
-                        {plan.features.join(', ')}
-                      </td>
                       <td className="p-4">
                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                          plan.is_active 
-                            ? 'bg-green-500/20 text-green-400' 
+                          plan.is_active
+                            ? 'bg-green-500/20 text-green-400'
                             : 'bg-red-500/20 text-red-400'
                         }`}>
                           {plan.is_active ? 'Активен' : 'Отключен'}
                         </span>
                       </td>
+                      <td className="p-4 text-slate-300">{formatDate(plan.created_at)}</td>
                       <td className="p-4">
                         <div className="flex items-center space-x-2">
                           <button
@@ -472,12 +500,21 @@ export default function Admin() {
                           >
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDeletePlan(plan.id)}
-                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {plan.is_active ? (
+                            <button
+                              onClick={() => handleDeactivatePlan(plan.id)}
+                              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
+                            >
+                              <Ban className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleActivatePlan(plan.id)}
+                              className="p-2 text-slate-400 hover:text-green-400 hover:bg-slate-700 rounded-lg transition-colors"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -576,52 +613,58 @@ export default function Admin() {
 
         {/* Marzban Tab */}
         {activeTab === 'marzban' && (
-          <div className="space-y-6">
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h2 className="text-xl font-semibold text-white mb-2">Управление Marzban</h2>
-                  <p className="text-slate-400">Синхронизация пользователей и мониторинг системы</p>
+          !marzbanEnabled ? (
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 text-center text-slate-300">
+              Интеграция отключена
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-white mb-2">Управление Marzban</h2>
+                    <p className="text-slate-400">Синхронизация пользователей и мониторинг системы</p>
+                  </div>
+                  <button
+                    onClick={handleSyncMarzban}
+                    disabled={syncing}
+                    className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                    <span>{syncing ? 'Синхронизация...' : 'Синхронизировать всех'}</span>
+                  </button>
                 </div>
-                <button
-                  onClick={handleSyncMarzban}
-                  disabled={syncing}
-                  className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                  <span>{syncing ? 'Синхронизация...' : 'Синхронизировать всех'}</span>
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <MarzbanStatsCard />
-                
-                <div className="bg-slate-700/30 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Информация о системе</h3>
-                  <div className="space-y-4 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Интеграция</span>
-                      <span className="text-green-400 font-medium">Активна</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Автосинхронизация</span>
-                      <span className="text-green-400 font-medium">Включена</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Тип подключения</span>
-                      <span className="text-white font-medium">REST API</span>
-                    </div>
-                    <div className="pt-4 border-t border-slate-600">
-                      <p className="text-slate-300">
-                        Все новые подписки автоматически создаются в Marzban. 
-                        Статистика трафика обновляется в реальном времени.
-                      </p>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <MarzbanStatsCard />
+
+                  <div className="bg-slate-700/30 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">Информация о системе</h3>
+                    <div className="space-y-4 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Интеграция</span>
+                        <span className="text-green-400 font-medium">Активна</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Автосинхронизация</span>
+                        <span className="text-green-400 font-medium">Включена</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Тип подключения</span>
+                        <span className="text-white font-medium">REST API</span>
+                      </div>
+                      <div className="pt-4 border-t border-slate-600">
+                        <p className="text-slate-300">
+                          Все новые подписки автоматически создаются в Marzban.
+                          Статистика трафика обновляется в реальном времени.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )
         )}
       </main>
 

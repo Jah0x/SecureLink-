@@ -12,6 +12,7 @@ interface VpnPlan {
   traffic_limit_gb: number | null;
   features: string[];
   is_active: boolean;
+  created_at: string;
 }
 
 export default function Pricing() {

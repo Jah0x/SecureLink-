@@ -9,6 +9,7 @@ interface VpnPlan {
   traffic_limit_gb: number | null;
   features: string[];
   is_active: boolean;
+  created_at: string;
 }
 
 interface GiveSubscriptionModalProps {
@@ -38,10 +39,10 @@ export default function GiveSubscriptionModal({
 
   const fetchPlans = async () => {
     try {
-      const response = await fetch('/api/admin/plans');
+      const response = await fetch('/api/admin/plans?active=1');
       if (response.ok) {
         const data = await response.json();
-        setPlans(data.filter((plan: VpnPlan) => plan.is_active));
+        setPlans(data);
       }
     } catch (error) {
       console.error('Failed to fetch plans:', error);

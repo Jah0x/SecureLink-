@@ -17,22 +17,39 @@ interface MarzbanStats {
   connected: boolean;
 }
 
+interface IntegrationsWindow extends Window {
+  __INTEGRATIONS?: { marzban?: { enabled?: boolean } };
+}
+
 export default function MarzbanStatsCard() {
   const [stats, setStats] = useState<MarzbanStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const marzbanEnabled = (window as IntegrationsWindow).__INTEGRATIONS?.marzban?.enabled === true;
 
   useEffect(() => {
+    if (!marzbanEnabled) {
+      setError('disabled');
+      setLoading(false);
+      return;
+    }
     fetchMarzbanStats();
-    
+
     // Refresh every 30 seconds
     const interval = setInterval(fetchMarzbanStats, 30000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchMarzbanStats = async () => {
+    if (!marzbanEnabled || error === 'disabled') return;
     try {
       const response = await fetch('/api/admin/marzban/stats');
+      if (response.status === 404) {
+        setError('disabled');
+        setStats(null);
+        return;
+      }
       if (response.ok) {
         const data = await response.json();
         setStats(data);
@@ -70,6 +87,14 @@ export default function MarzbanStatsCard() {
             <Activity className="w-8 h-8 text-blue-500" />
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (error === 'disabled') {
+    return (
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
+        <div className="text-center py-4 text-slate-300">Интеграция отключена</div>
       </div>
     );
   }
