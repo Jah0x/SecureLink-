@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/auth';
 import { useNavigate } from 'react-router';
 import Header from '@/react-app/components/Header';
-import { Check, Shield } from 'lucide-react';
+import { Check, Shield, Zap, Globe } from 'lucide-react';
 
 interface VpnPlan {
   id: number;
@@ -21,6 +21,29 @@ export default function Pricing() {
   const [plans, setPlans] = useState<VpnPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<number | null>(null);
+
+  const ICONS = { zap: Zap, globe: Globe, shield: Shield, check: Check } as const;
+  type IconName = keyof typeof ICONS;
+  const commonFeatures: { icon: IconName; title: string; description: string; gradient: string }[] = [
+    {
+      icon: 'shield',
+      title: 'Максимальная безопасность',
+      description: 'AES-256 шифрование и строгая политика отсутствия логов',
+      gradient: 'from-blue-500 to-purple-600',
+    },
+    {
+      icon: 'zap',
+      title: 'Высокая скорость',
+      description: 'Оптимизированные серверы для максимальной производительности',
+      gradient: 'from-green-500 to-blue-500',
+    },
+    {
+      icon: 'globe',
+      title: 'Глобальное покрытие',
+      description: 'Серверы в 50+ странах мира для лучшего подключения',
+      gradient: 'from-purple-500 to-pink-500',
+    },
+  ];
 
   useEffect(() => {
     if (!user) {
@@ -167,39 +190,18 @@ export default function Pricing() {
             Все планы включают
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-xl w-16 h-16 mx-auto mb-4">
-                <Shield className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                Максимальная безопасность
-              </h3>
-              <p className="text-slate-400">
-                AES-256 шифрование и строгая политика отсутствия логов
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="bg-gradient-to-r from-green-500 to-blue-500 p-4 rounded-xl w-16 h-16 mx-auto mb-4">
-                <Zap className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                Высокая скорость
-              </h3>
-              <p className="text-slate-400">
-                Оптимизированные серверы для максимальной производительности
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 rounded-xl w-16 h-16 mx-auto mb-4">
-                <Globe className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                Глобальное покрытие
-              </h3>
-              <p className="text-slate-400">
-                Серверы в 50+ странах мира для лучшего подключения
-              </p>
-            </div>
+            {commonFeatures.map((f) => {
+              const Icon = ICONS[f.icon];
+              return (
+                <div key={f.title} className="text-center">
+                  <div className={`bg-gradient-to-r ${f.gradient} p-4 rounded-xl w-16 h-16 mx-auto mb-4`}>
+                    <Icon className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">{f.title}</h3>
+                  <p className="text-slate-400">{f.description}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </main>
