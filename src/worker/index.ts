@@ -65,6 +65,24 @@ if (AUTH_MODE === 'internal') {
   )`)
   db.exec('CREATE INDEX IF NOT EXISTS idx_plans_active ON plans(is_active)')
 
+  db.exec(`CREATE TABLE IF NOT EXISTS affiliates (
+    user_id    INTEGER UNIQUE NOT NULL,
+    code       TEXT    UNIQUE NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`)
+  db.exec(`CREATE TABLE IF NOT EXISTS affiliate_events (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    code         TEXT NOT NULL,
+    type         TEXT NOT NULL CHECK(type IN ('click','signup','purchase')),
+    amount_cents INTEGER NOT NULL DEFAULT 0,
+    ip           TEXT,
+    ua           TEXT,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`)
+  if (!cols.includes('ref_code')) {
+    db.exec("ALTER TABLE users ADD COLUMN ref_code TEXT")
+  }
+
   if (ADMIN_EMAILS.length) {
     const placeholders = ADMIN_EMAILS.map(() => '?').join(',')
     db.prepare(`UPDATE users SET role='admin' WHERE lower(email) IN (${placeholders})`).run(...ADMIN_EMAILS)
@@ -137,6 +155,11 @@ app.post('/api/auth/register', async (c) => {
       .prepare('INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)')
       .run(email, hash)
     const user = { id: info.lastInsertRowid as number, email, role: 'user' }
+    const aff = getCookie(c, 'aff_code')
+    if (aff) {
+      db.prepare('UPDATE users SET ref_code=? WHERE id=?').run(aff, user.id)
+      db.prepare('INSERT INTO affiliate_events (code, type) VALUES (?, ? )').run(aff, 'signup')
+    }
     const token = jwt.sign({ sub: user.id, email: user.email, role: user.role }, SESSION_SECRET, {
       algorithm: 'HS256',
     })
@@ -211,6 +234,17 @@ if (AUTH_MODE === 'proxy') {
     }
   })
 } else {
+  function genAffCode() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+    while (true) {
+      const len = 6 + Math.floor(Math.random() * 3)
+      let code = ''
+      for (let i = 0; i < len; i++) code += chars[Math.floor(Math.random() * chars.length)]
+      const exists = db.prepare('SELECT 1 FROM affiliates WHERE code=?').get(code)
+      if (!exists) return code
+    }
+  }
+
   app.get('/api/users/me', requireAuth, (c) => {
     const user: any = c.get('user')
     const row = db
@@ -221,6 +255,13 @@ if (AUTH_MODE === 'proxy') {
   })
 
   app.get('/api/admin/ping', requireAuth, requireAdmin, (c) => c.json({ ok: true }))
+
+  app.get('/api/admin/users', requireAuth, requireAdmin, (c) => {
+    const rows = db
+      .prepare('SELECT id, email, role, created_at FROM users ORDER BY created_at DESC')
+      .all()
+    return c.json(rows)
+  })
 
   app.get('/api/plans', (c) => {
     const rows = db
@@ -237,19 +278,15 @@ if (AUTH_MODE === 'proxy') {
   })
 
   app.get('/api/admin/plans', requireAuth, requireAdmin, (c) => {
-    const url = new URL(c.req.url)
-    const offset = Number(url.searchParams.get('offset') ?? '0')
-    const limit = Number(url.searchParams.get('limit') ?? '50')
-    const activeParam = url.searchParams.get('active') ?? 'all'
-    let sql = 'SELECT * FROM plans'
-    const params: any[] = []
-    if (activeParam === '1' || activeParam === '0') {
-      sql += ' WHERE is_active=?'
-      params.push(Number(activeParam))
-    }
-    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    params.push(limit, offset)
-    const rows = db.prepare(sql).all(...params)
+    const offset = Number(c.req.query('offset') || '0')
+    const limit = Number(c.req.query('limit') || '50')
+    const q = (c.req.query('active') || 'all').toLowerCase()
+    let where = ''
+    if (['1', 'true', 'active'].includes(q)) where = 'WHERE is_active=1'
+    else if (['0', 'false', 'inactive'].includes(q)) where = 'WHERE is_active=0'
+    const rows = db
+      .prepare(`SELECT * FROM plans ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+      .all(limit, offset)
     const plans = rows.map((r: any) => ({
       ...r,
       features: r.features ? JSON.parse(r.features) : [],
@@ -385,6 +422,50 @@ if (AUTH_MODE === 'proxy') {
     const id = Number(c.req.param('id'))
     db.prepare('UPDATE plans SET is_active=1 WHERE id=?').run(id)
     return c.json({ ok: true })
+  })
+
+  app.get('/r/:code', (c) => {
+    const code = c.req.param('code')
+    const row = db.prepare('SELECT code FROM affiliates WHERE code=?').get(code)
+    if (row) {
+      const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || ''
+      const ua = c.req.header('user-agent') || ''
+      db.prepare('INSERT INTO affiliate_events (code, type, ip, ua) VALUES (?, ?, ?, ?)').run(code, 'click', ip, ua)
+      setCookie(c, 'aff_code', code, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30,
+        sameSite: 'None',
+        secure: true,
+      })
+      return c.redirect('/register')
+    }
+    return c.redirect('/pricing')
+  })
+
+  app.get('/api/aff/me', requireAuth, (c) => {
+    const user: any = c.get('user')
+    let row = db.prepare('SELECT code FROM affiliates WHERE user_id=?').get(user.sub)
+    if (!row) {
+      const code = genAffCode()
+      db.prepare('INSERT INTO affiliates (user_id, code) VALUES (?, ?)').run(user.sub, code)
+      row = { code }
+    }
+    const statsRows = db
+      .prepare('SELECT type, COUNT(*) as cnt, SUM(amount_cents) as amt FROM affiliate_events WHERE code=? GROUP BY type')
+      .all(row.code)
+    let clicks = 0,
+      signups = 0,
+      earnings = 0
+    for (const s of statsRows) {
+      if (s.type === 'click') clicks = s.cnt
+      else if (s.type === 'signup') signups = s.cnt
+      else if (s.type === 'purchase') earnings = s.amt || 0
+    }
+    return c.json({
+      code: row.code,
+      share_url: `https://dashboard.zerologsvpn.com/r/${row.code}`,
+      stats: { clicks, signups, earnings_cents: earnings || 0 },
+    })
   })
 }
 

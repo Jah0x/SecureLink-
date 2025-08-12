@@ -3,10 +3,8 @@ import { useAuth } from '@/auth';
 import { useNavigate } from 'react-router';
 import Header from '@/react-app/components/Header';
 import PlanModal from '@/react-app/components/PlanModal';
-import GiveSubscriptionModal from '@/react-app/components/GiveSubscriptionModal';
-import PartnerLevelsModal from '@/react-app/components/PartnerLevelsModal';
-import { Users, Settings, CreditCard, Plus, Edit, Gift, RefreshCw, Server, DollarSign, TrendingUp, Check, Ban } from 'lucide-react';
-import MarzbanStatsCard from '@/react-app/components/MarzbanStatsCard';
+import { Users, CreditCard, Plus, Edit, Ban, Check } from 'lucide-react';
+import { apiFetch } from '@/react-app/api';
 
 interface VpnPlan {
   id: number;
@@ -29,50 +27,23 @@ interface VpnPlanForm {
   is_active: boolean;
 }
 
-interface VpnUserInfo {
+interface AdminUser {
   id: number;
   email: string;
-  username: string | null;
-  is_active: boolean;
-  subscription: {
-    plan_name: string;
-    expires_at: string | null;
-    used_data_gb: number;
-    data_limit_gb: number | null;
-  } | null;
+  role: string;
   created_at: string;
-}
-
-interface PartnerStats {
-  total_partners: number;
-  active_partners: number;
-  total_payouts: number;
-  total_referrals: number;
-}
-
-interface IntegrationsWindow extends Window {
-  __INTEGRATIONS?: { marzban?: { enabled?: boolean } };
 }
 
 export default function Admin() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'partners' | 'marzban'>('users');
-  const [syncing, setSyncing] = useState(false);
-  const [users, setUsers] = useState<VpnUserInfo[]>([]);
+  const [activeTab, setActiveTab] = useState<'users' | 'plans'>('users');
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [plans, setPlans] = useState<VpnPlan[]>([]);
   const [planFilter, setPlanFilter] = useState<'all' | '1' | '0'>('all');
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  
-  // Modal states
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<VpnPlan | null>(null);
-  const [showGiveSubModal, setShowGiveSubModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<{ id: number; email: string } | null>(null);
-  const [showPartnerLevelsModal, setShowPartnerLevelsModal] = useState(false);
-  const [partnerStats, setPartnerStats] = useState<PartnerStats | null>(null);
-  const marzbanEnabled = (window as IntegrationsWindow).__INTEGRATIONS?.marzban?.enabled === true;
 
   useEffect(() => {
     if (!user) {
@@ -83,51 +54,24 @@ export default function Admin() {
       setLoading(false);
       return;
     }
-    setIsAdmin(true);
-    (async () => {
-      await fetchData();
-      setLoading(false);
-    })();
-  }, [user, navigate]);
-
-  useEffect(() => {
-    if (isAdmin) {
-      fetchData();
-    }
-  }, [planFilter, isAdmin]);
+    fetchData().finally(() => setLoading(false));
+  }, [user, navigate, planFilter]);
 
   const fetchData = async () => {
     try {
-      const [usersRes, plansRes, partnerStatsRes] = await Promise.all([
-        fetch('/api/admin/users'),
-        fetch(`/api/admin/plans?active=${planFilter}`),
-        fetch('/api/admin/partner-stats')
+      const [usersData, plansData] = await Promise.all([
+        apiFetch('/api/admin/users'),
+        apiFetch(`/api/admin/plans?active=${planFilter}`),
       ]);
-
-      if (usersRes.ok) {
-        const usersData = await usersRes.json();
-        setUsers(usersData);
-      }
-
-      if (plansRes.ok) {
-        const plansData = await plansRes.json();
-        setPlans(plansData);
-      }
-
-      if (partnerStatsRes.ok) {
-        const partnerStatsData = (await partnerStatsRes.json()) as PartnerStats;
-        setPartnerStats(partnerStatsData);
-      }
-    } catch (error) {
-      console.error('Failed to fetch admin data:', error);
+      setUsers(usersData as AdminUser[]);
+      setPlans(plansData as VpnPlan[]);
+    } catch (e) {
+      console.error('Failed to fetch admin data:', e);
     }
   };
 
   const handleSavePlan = async (planData: VpnPlanForm) => {
     try {
-      const isEditing = editingPlan && editingPlan.id;
-      const url = isEditing ? `/api/admin/plans/${editingPlan.id}` : '/api/admin/plans';
-      const method = isEditing ? 'PUT' : 'POST';
       const payload = {
         name: planData.name,
         price_cents: Math.round(planData.price_rub * 100),
@@ -138,23 +82,14 @@ export default function Admin() {
           : [],
         is_active: planData.is_active,
       };
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        await fetchData();
-        setShowPlanModal(false);
-        setEditingPlan(null);
-      } else {
-        alert('Ошибка при сохранении плана');
-      }
-    } catch (error) {
-      console.error('Failed to save plan:', error);
+      const method = planData.id ? 'PUT' : 'POST';
+      const url = planData.id ? `/api/admin/plans/${planData.id}` : '/api/admin/plans';
+      await apiFetch(url, { method, body: JSON.stringify(payload) });
+      setShowPlanModal(false);
+      setEditingPlan(null);
+      await fetchData();
+    } catch (e) {
+      console.error('Failed to save plan:', e);
       alert('Ошибка при сохранении плана');
     }
   };
@@ -162,74 +97,21 @@ export default function Admin() {
   const handleDeactivatePlan = async (planId: number) => {
     if (!confirm('Отключить этот план?')) return;
     try {
-      const response = await fetch(`/api/admin/plans/${planId}`, { method: 'DELETE' });
-      if (response.ok) await fetchData();
-      else alert('Ошибка при отключении плана');
-    } catch (error) {
-      console.error('Failed to deactivate plan:', error);
+      await apiFetch(`/api/admin/plans/${planId}`, { method: 'DELETE' });
+      await fetchData();
+    } catch (e) {
+      console.error('Failed to deactivate plan:', e);
       alert('Ошибка при отключении плана');
     }
   };
 
   const handleActivatePlan = async (planId: number) => {
     try {
-      const response = await fetch(`/api/admin/plans/${planId}/activate`, { method: 'POST' });
-      if (response.ok) await fetchData();
-      else alert('Ошибка при активации плана');
-    } catch (error) {
-      console.error('Failed to activate plan:', error);
+      await apiFetch(`/api/admin/plans/${planId}/activate`, { method: 'POST' });
+      await fetchData();
+    } catch (e) {
+      console.error('Failed to activate plan:', e);
       alert('Ошибка при активации плана');
-    }
-  };
-
-  const handleGiveSubscription = async (userId: number, planId: number) => {
-    try {
-      const response = await fetch('/api/admin/give-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId, planId }),
-      });
-
-      if (response.ok) {
-        await fetchData();
-        setShowGiveSubModal(false);
-        setSelectedUser(null);
-      } else {
-        const error = await response.json();
-        alert(`Ошибка: ${error.message}`);
-      }
-    } catch (error) {
-      console.error('Failed to give subscription:', error);
-      alert('Ошибка при выдаче подписки');
-    }
-  };
-
-  const handleSyncMarzban = async () => {
-    if (!marzbanEnabled) {
-      alert('Интеграция отключена');
-      return;
-    }
-    setSyncing(true);
-    try {
-      const response = await fetch('/api/admin/marzban/sync', {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        alert(`Синхронизация завершена!\nУспешно: ${data.synced}\nОшибок: ${data.failed}\nВсего: ${data.total}`);
-        await fetchData();
-      } else {
-        const error = await response.json();
-        alert(`Ошибка синхронизации: ${error.error}`);
-      }
-    } catch (error) {
-      console.error('Failed to sync with Marzban:', error);
-      alert('Ошибка при синхронизации с Marzban');
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -251,14 +133,14 @@ export default function Admin() {
         <Header />
         <div className="flex items-center justify-center h-96">
           <div className="animate-spin">
-            <Settings className="w-10 h-10 text-blue-500" />
+            <Users className="w-10 h-10 text-blue-500" />
           </div>
         </div>
       </div>
     );
   }
 
-  if (!isAdmin) {
+  if (!user || user.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <Header />
@@ -275,14 +157,13 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <Header />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Админ-панель</h1>
           <p className="text-slate-400">Управление пользователями и тарифными планами</p>
         </div>
 
-        {/* Tabs */}
         <div className="flex space-x-1 mb-8 bg-slate-800/50 backdrop-blur-sm rounded-xl p-1">
           <button
             onClick={() => setActiveTab('users')}
@@ -306,31 +187,8 @@ export default function Admin() {
             <CreditCard className="w-4 h-4" />
             <span>Тарифные планы</span>
           </button>
-          <button
-            onClick={() => setActiveTab('partners')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'partners'
-                ? 'bg-blue-500 text-white'
-                : 'text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
-          >
-            <DollarSign className="w-4 h-4" />
-            <span>Партнеры</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('marzban')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'marzban'
-                ? 'bg-blue-500 text-white'
-                : 'text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
-          >
-            <Server className="w-4 h-4" />
-            <span>Marzban</span>
-          </button>
         </div>
 
-        {/* Users Tab */}
         {activeTab === 'users' && (
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700">
             <div className="p-6 border-b border-slate-700">
@@ -343,77 +201,16 @@ export default function Admin() {
                 <thead>
                   <tr className="border-b border-slate-700">
                     <th className="text-left p-4 text-slate-300 font-medium">Email</th>
-                    <th className="text-left p-4 text-slate-300 font-medium">Подписка</th>
-                    <th className="text-left p-4 text-slate-300 font-medium">Трафик</th>
-                    <th className="text-left p-4 text-slate-300 font-medium">Истекает</th>
-                    <th className="text-left p-4 text-slate-300 font-medium">Статус</th>
-                    <th className="text-left p-4 text-slate-300 font-medium">Регистрация</th>
-                    <th className="text-left p-4 text-slate-300 font-medium">Действия</th>
+                    <th className="text-left p-4 text-slate-300 font-medium">Роль</th>
+                    <th className="text-left p-4 text-slate-300 font-medium">Создан</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user) => (
-                    <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
-                      <td className="p-4">
-                        <div>
-                          <div className="text-white font-medium">{user.email}</div>
-                          {user.username && (
-                            <div className="text-slate-400 text-sm">{user.username}</div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        {user.subscription ? (
-                          <span className="text-slate-300">{user.subscription.plan_name}</span>
-                        ) : (
-                          <span className="text-slate-500">Нет подписки</span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        {user.subscription ? (
-                          <span className="text-slate-300">
-                            {user.subscription.used_data_gb} ГБ
-                            {user.subscription.data_limit_gb && 
-                              ` / ${user.subscription.data_limit_gb} ГБ`
-                            }
-                          </span>
-                        ) : (
-                          <span className="text-slate-500">—</span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        {user.subscription?.expires_at ? (
-                          <span className="text-slate-300">
-                            {formatDate(user.subscription.expires_at)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-500">—</span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                          user.is_active 
-                            ? 'bg-green-500/20 text-green-400' 
-                            : 'bg-red-500/20 text-red-400'
-                        }`}>
-                          {user.is_active ? 'Активен' : 'Заблокирован'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-slate-300">
-                        {formatDate(user.created_at)}
-                      </td>
-                      <td className="p-4">
-                        <button
-                          onClick={() => {
-                            setSelectedUser({ id: user.id, email: user.email });
-                            setShowGiveSubModal(true);
-                          }}
-                          className="p-2 text-slate-400 hover:text-green-400 hover:bg-slate-700 rounded-lg transition-colors"
-                          title="Выдать подписку"
-                        >
-                          <Gift className="w-4 h-4" />
-                        </button>
-                      </td>
+                  {users.map((u) => (
+                    <tr key={u.id} className="border-b border-slate-700/50">
+                      <td className="p-4 text-white">{u.email}</td>
+                      <td className="p-4 text-slate-300">{u.role}</td>
+                      <td className="p-4 text-slate-300">{formatDate(u.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -422,7 +219,6 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Plans Tab */}
         {activeTab === 'plans' && (
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700">
             <div className="p-6 border-b border-slate-700 flex justify-between items-center">
@@ -470,21 +266,17 @@ export default function Admin() {
                       <td className="p-4">
                         <div className="text-white font-medium">{plan.name}</div>
                       </td>
-                      <td className="p-4 text-slate-300">
-                        {formatPrice(plan.price_cents)}
-                      </td>
-                      <td className="p-4 text-slate-300">
-                        {plan.period_days}
-                      </td>
-                      <td className="p-4 text-slate-300">
-                        {plan.traffic_limit_gb ? `${plan.traffic_limit_gb} ГБ` : 'Безлимит'}
-                      </td>
+                      <td className="p-4 text-slate-300">{formatPrice(plan.price_cents)}</td>
+                      <td className="p-4 text-slate-300">{plan.period_days}</td>
+                      <td className="p-4 text-slate-300">{plan.traffic_limit_gb ? `${plan.traffic_limit_gb} ГБ` : 'Безлимит'}</td>
                       <td className="p-4">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                          plan.is_active
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-red-500/20 text-red-400'
-                        }`}>
+                        <span
+                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                            plan.is_active
+                              ? 'bg-green-500/20 text-green-400'
+                              : 'bg-red-500/20 text-red-400'
+                          }`}
+                        >
                           {plan.is_active ? 'Активен' : 'Отключен'}
                         </span>
                       </td>
@@ -524,151 +316,8 @@ export default function Admin() {
             </div>
           </div>
         )}
-
-        {/* Partners Tab */}
-        {activeTab === 'partners' && (
-          <div className="space-y-6">
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
-              <h2 className="text-xl font-semibold text-white mb-6">Управление партнерами</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                <div className="bg-slate-700/30 rounded-xl p-4">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <Users className="w-5 h-5 text-blue-400" />
-                    <span className="text-slate-300 text-sm">Всего партнеров</span>
-                  </div>
-                  <div className="text-2xl font-bold text-white">{partnerStats?.total_partners || 0}</div>
-                </div>
-                
-                <div className="bg-slate-700/30 rounded-xl p-4">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <TrendingUp className="w-5 h-5 text-green-400" />
-                    <span className="text-slate-300 text-sm">Активных партнеров</span>
-                  </div>
-                  <div className="text-2xl font-bold text-white">{partnerStats?.active_partners || 0}</div>
-                </div>
-                
-                <div className="bg-slate-700/30 rounded-xl p-4">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <DollarSign className="w-5 h-5 text-purple-400" />
-                    <span className="text-slate-300 text-sm">Общие выплаты</span>
-                  </div>
-                  <div className="text-2xl font-bold text-white">{formatPrice(partnerStats?.total_payouts || 0)}</div>
-                </div>
-                
-                <div className="bg-slate-700/30 rounded-xl p-4">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <Gift className="w-5 h-5 text-orange-400" />
-                    <span className="text-slate-300 text-sm">Рефералы</span>
-                  </div>
-                  <div className="text-2xl font-bold text-white">{partnerStats?.total_referrals || 0}</div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-slate-700/30 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Уровни партнеров</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-300">Новичок</span>
-                      <span className="text-green-400 font-medium">10%</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-300">Бронза</span>
-                      <span className="text-green-400 font-medium">15%</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-300">Серебро</span>
-                      <span className="text-green-400 font-medium">20%</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-300">Золото</span>
-                      <span className="text-green-400 font-medium">25%</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-300">Платина</span>
-                      <span className="text-green-400 font-medium">30%</span>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setShowPartnerLevelsModal(true)}
-                    className="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Настроить уровни
-                  </button>
-                </div>
-                
-                <div className="bg-slate-700/30 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Недавняя активность</h3>
-                  <div className="space-y-3 text-sm">
-                    <div className="text-slate-400">
-                      Пока нет активности партнеров
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Marzban Tab */}
-        {activeTab === 'marzban' && (
-          !marzbanEnabled ? (
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 text-center text-slate-300">
-              Интеграция отключена
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <h2 className="text-xl font-semibold text-white mb-2">Управление Marzban</h2>
-                    <p className="text-slate-400">Синхронизация пользователей и мониторинг системы</p>
-                  </div>
-                  <button
-                    onClick={handleSyncMarzban}
-                    disabled={syncing}
-                    className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                    <span>{syncing ? 'Синхронизация...' : 'Синхронизировать всех'}</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <MarzbanStatsCard />
-
-                  <div className="bg-slate-700/30 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-white mb-4">Информация о системе</h3>
-                    <div className="space-y-4 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Интеграция</span>
-                        <span className="text-green-400 font-medium">Активна</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Автосинхронизация</span>
-                        <span className="text-green-400 font-medium">Включена</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Тип подключения</span>
-                        <span className="text-white font-medium">REST API</span>
-                      </div>
-                      <div className="pt-4 border-t border-slate-600">
-                        <p className="text-slate-300">
-                          Все новые подписки автоматически создаются в Marzban.
-                          Статистика трафика обновляется в реальном времени.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        )}
       </main>
 
-      {/* Modals */}
       <PlanModal
         isOpen={showPlanModal}
         onClose={() => {
@@ -677,25 +326,6 @@ export default function Admin() {
         }}
         plan={editingPlan}
         onSave={handleSavePlan}
-      />
-
-      {selectedUser && (
-        <GiveSubscriptionModal
-          isOpen={showGiveSubModal}
-          onClose={() => {
-            setShowGiveSubModal(false);
-            setSelectedUser(null);
-          }}
-          userId={selectedUser.id}
-          userEmail={selectedUser.email}
-          onGive={handleGiveSubscription}
-        />
-      )}
-
-      <PartnerLevelsModal
-        isOpen={showPartnerLevelsModal}
-        onClose={() => setShowPartnerLevelsModal(false)}
-        onSave={fetchData}
       />
     </div>
   );
