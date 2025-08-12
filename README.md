@@ -1,6 +1,6 @@
 # SecureLink VPN
 
-Проект обеспечивает личный кабинет для управления VPN-сервисом. Аутентификация выполняется через собственный сервис по email и паролю. Статические файлы обслуживаются через `@hono/node-server/serve-static`. Приложение проксирует запросы `/api/auth/*` и `/api/users/me`, устанавливая HttpOnly-куку сессии на домен `.zerologsvpn.com`.
+Проект обеспечивает личный кабинет для управления VPN-сервисом. Аутентификация может выполняться локально через SQLite/argon2 или проксироваться во внешний сервис. Статические файлы обслуживаются через `@hono/node-server/serve-static`. Приложение устанавливает HttpOnly-куку сессии на домен `.zerologsvpn.com`.
 
 ## Запуск в разработке
 
@@ -29,7 +29,8 @@ npm run build && npm run smoke:head
 
 Перед запуском задайте переменные окружения:
 
-- `AUTH_BASE_URL` – базовый URL сервиса авторизации
+- `AUTH_MODE` – `internal` (по умолчанию) или `proxy`
+- `AUTH_BASE_URL` – базовый URL сервиса авторизации для режима `proxy`
 - `AUTH_PATH_REGISTER` – путь регистрации (по умолчанию `/users/register`)
 - `AUTH_PATH_LOGIN` – путь входа (по умолчанию `/users/login`)
 - `AUTH_PATH_ME` – путь профиля пользователя (по умолчанию `/users/me`)
@@ -39,6 +40,7 @@ npm run build && npm run smoke:head
 - `SESSION_COOKIE_SECURE` – флаг `Secure`
 - `SESSION_COOKIE_SAMESITE` – политика `SameSite`
 - `SESSION_COOKIE_MAXAGE` – время жизни куки в секундах
+- `SESSION_SECRET` – секрет подписи JWT‑сессии
 - `NEXT_PUBLIC_API_BASE_URL` – базовый URL API (обычно `https://dashboard.zerologsvpn.com`)
 
 Проект ожидает, что в каталоге `public/` будут размещены локальные иконки и изображения для Open Graph. Из-за политики репозитория бинарные файлы не хранятся в Git, поэтому добавьте собственные изображения перед деплоем.

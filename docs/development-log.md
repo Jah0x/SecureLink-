@@ -31,3 +31,4 @@
 - Статика теперь раздаётся через `@hono/node-server/serve-static`, документация обновлена.
 - Добавлены прокси `/api/auth/register`, `/api/auth/login`, `/api/auth/logout` и `/api/users/me` к сервису AUTH с установкой HttpOnly-куки на `.zerologsvpn.com`; реализован OAuth helper `/thirdparty/:provider/redirect_url`; обновлён `.env.example` с настройками куки и путей AUTH; README дополнен инструкциями по проверкам `npm run build && npm run smoke:head`.
 - Полностью убрана интеграция Hanko/SSO: удалены маршруты `/thirdparty/*`, введены переменные `AUTH_BASE_URL` и `AUTH_PATH_*`, фронтенд использует только формы email/пароль.
+- Добавлена внутренняя аутентификация на SQLite/argon2 с JWT‑сессиями и опциональным проксированием во внешний AUTH.
