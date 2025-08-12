@@ -20,16 +20,9 @@ spec:
           ports:
             - containerPort: 5173
           env:
-            - name: HUNKO_USERS_SERVICE_API_URL
-              value: "http://hunko-users:8000"
-            - name: HUNKO_USERS_SERVICE_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: securelink-secrets
-                  key: hunkoApiKey
+            - name: AUTH_BASE_URL
+              value: "http://auth:8000"
             - name: NEXT_PUBLIC_API_BASE_URL
-              value: "https://dashboard.zerologsvpn.com"
-            - name: NEXT_PUBLIC_HANKO_API_URL
               value: "https://dashboard.zerologsvpn.com"
           readinessProbe:
             httpGet:
