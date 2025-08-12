@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useAuth } from '@/auth';
 import { Link, useLocation } from 'react-router';
 import { Shield, LogOut, User, Settings, ShoppingCart, DollarSign } from 'lucide-react';
@@ -6,29 +5,6 @@ import { Shield, LogOut, User, Settings, ShoppingCart, DollarSign } from 'lucide
 export default function Header() {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [adminCheckLoading, setAdminCheckLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) {
-        setAdminCheckLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/admin/check');
-        setIsAdmin(response.ok);
-      } catch (error) {
-        console.error('Admin check failed:', error);
-        setIsAdmin(false);
-      } finally {
-        setAdminCheckLoading(false);
-      }
-    };
-
-    checkAdminStatus();
-  }, [user]);
 
   return (
     <header className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-50">
@@ -79,7 +55,7 @@ export default function Header() {
                   <DollarSign className="w-4 h-4" />
                   <span>Заработок</span>
                 </Link>
-                {!adminCheckLoading && isAdmin && (
+                {user?.role === 'admin' && (
                   <Link
                     to="/admin"
                     className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${

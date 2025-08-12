@@ -4,11 +4,10 @@ import { X } from 'lucide-react';
 interface VpnPlan {
   id: number;
   name: string;
-  duration_months: number;
-  price_rub: number;
-  data_limit_gb: number | null;
-  max_connections: number;
-  description: string;
+  price_cents: number;
+  period_days: number;
+  traffic_limit_gb: number | null;
+  features: string[];
   is_active: boolean;
 }
 
@@ -64,12 +63,12 @@ export default function GiveSubscriptionModal({
     }
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (priceCents: number) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
       minimumFractionDigits: 0,
-    }).format(price);
+    }).format(priceCents / 100);
   };
 
   if (!isOpen) return null;
@@ -124,13 +123,12 @@ export default function GiveSubscriptionModal({
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="text-white font-medium">{plan.name}</div>
-                      <div className="text-slate-400 text-sm">{plan.description}</div>
                       <div className="text-slate-300 text-sm mt-1">
-                        {plan.duration_months} мес. • {plan.data_limit_gb ? `${plan.data_limit_gb} ГБ` : 'Безлимит'}
+                        {plan.period_days} дн. • {plan.traffic_limit_gb ? `${plan.traffic_limit_gb} ГБ` : 'Безлимит'}
                       </div>
                     </div>
                     <div className="text-blue-400 font-semibold">
-                      {formatPrice(plan.price_rub)}
+                      {formatPrice(plan.price_cents)}
                     </div>
                   </div>
                 </label>

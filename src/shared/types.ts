@@ -49,14 +49,12 @@ export const VpnConnectionSchema = z.object({
 export const VpnPlanSchema = z.object({
   id: z.number(),
   name: z.string(),
-  duration_months: z.number(),
-  price_rub: z.number(),
-  data_limit_gb: z.number().nullable(),
-  max_connections: z.number(),
+  price_cents: z.number(),
+  period_days: z.number(),
+  traffic_limit_gb: z.number().nullable(),
+  features: z.array(z.string()),
   is_active: z.boolean(),
-  description: z.string().nullable(),
   created_at: z.string(),
-  updated_at: z.string(),
 });
 
 export type VpnUser = z.infer<typeof VpnUserSchema>;
