@@ -63,6 +63,7 @@ if (AUTH_MODE === 'internal') {
     is_active INTEGER NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`)
+  db.exec('CREATE INDEX IF NOT EXISTS idx_plans_active ON plans(is_active)')
 
   if (ADMIN_EMAILS.length) {
     const placeholders = ADMIN_EMAILS.map(() => '?').join(',')
@@ -224,63 +225,165 @@ if (AUTH_MODE === 'proxy') {
   app.get('/api/plans', (c) => {
     const rows = db
       .prepare(
-        'SELECT id, name, price_cents, period_days, traffic_limit_gb, features FROM plans WHERE is_active=1'
+        'SELECT id, name, price_cents, period_days, traffic_limit_gb, features, is_active, created_at FROM plans WHERE is_active=1 ORDER BY created_at DESC'
       )
       .all()
-    const plans = rows.map((r: any) => ({ ...r, features: r.features ? JSON.parse(r.features) : [] }))
+    const plans = rows.map((r: any) => ({
+      ...r,
+      features: r.features ? JSON.parse(r.features) : [],
+      is_active: Boolean(r.is_active),
+    }))
     return c.json(plans)
   })
 
   app.get('/api/admin/plans', requireAuth, requireAdmin, (c) => {
-    const rows = db.prepare('SELECT * FROM plans').all()
-    const plans = rows.map((r: any) => ({ ...r, features: r.features ? JSON.parse(r.features) : [] }))
+    const url = new URL(c.req.url)
+    const offset = Number(url.searchParams.get('offset') ?? '0')
+    const limit = Number(url.searchParams.get('limit') ?? '50')
+    const activeParam = url.searchParams.get('active') ?? 'all'
+    let sql = 'SELECT * FROM plans'
+    const params: any[] = []
+    if (activeParam === '1' || activeParam === '0') {
+      sql += ' WHERE is_active=?'
+      params.push(Number(activeParam))
+    }
+    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+    params.push(limit, offset)
+    const rows = db.prepare(sql).all(...params)
+    const plans = rows.map((r: any) => ({
+      ...r,
+      features: r.features ? JSON.parse(r.features) : [],
+      is_active: Boolean(r.is_active),
+    }))
     return c.json(plans)
+  })
+
+  app.get('/api/admin/plans/:id', requireAuth, requireAdmin, (c) => {
+    const id = Number(c.req.param('id'))
+    const row = db.prepare('SELECT * FROM plans WHERE id=?').get(id)
+    if (!row) return c.json({ error: 'not_found' }, 404)
+    const plan = {
+      ...row,
+      features: row.features ? JSON.parse(row.features) : [],
+      is_active: Boolean(row.is_active),
+    }
+    return c.json(plan)
   })
 
   app.post('/api/admin/plans', requireAuth, requireAdmin, async (c) => {
     const body = await c.req.json()
-    const { name, price_cents, period_days, traffic_limit_gb, features = [], is_active = 1 } = body || {}
-    if (!name || !price_cents || price_cents <= 0 || !period_days || period_days < 1) {
-      return c.json({ error: 'invalid_input' }, 400)
+    const {
+      name,
+      price_cents,
+      period_days,
+      traffic_limit_gb = null,
+      features,
+      is_active = true,
+    } = body || {}
+    if (!name || name.length < 1 || name.length > 100) {
+      return c.json({ error: 'invalid_name', field: 'name' }, 400)
     }
-    if (traffic_limit_gb != null && traffic_limit_gb < 0) {
-      return c.json({ error: 'invalid_input' }, 400)
+    if (!Number.isInteger(price_cents) || price_cents <= 0) {
+      return c.json({ error: 'invalid_price', field: 'price_cents' }, 400)
+    }
+    if (!Number.isInteger(period_days) || period_days < 1) {
+      return c.json({ error: 'invalid_period', field: 'period_days' }, 400)
+    }
+    if (traffic_limit_gb != null && (!Number.isInteger(traffic_limit_gb) || traffic_limit_gb < 0)) {
+      return c.json({ error: 'invalid_traffic', field: 'traffic_limit_gb' }, 400)
+    }
+    if (features != null && !Array.isArray(features)) {
+      return c.json({ error: 'invalid_features', field: 'features' }, 400)
     }
     const info = db
       .prepare(
         'INSERT INTO plans (name, price_cents, period_days, traffic_limit_gb, features, is_active) VALUES (?, ?, ?, ?, ?, ?)'
       )
-      .run(name, price_cents, period_days, traffic_limit_gb ?? null, JSON.stringify(features), is_active ? 1 : 0)
-    return c.json({ id: info.lastInsertRowid })
+      .run(
+        name,
+        price_cents,
+        period_days,
+        traffic_limit_gb,
+        features ? JSON.stringify(features) : null,
+        is_active ? 1 : 0
+      )
+    const row = db.prepare('SELECT * FROM plans WHERE id=?').get(info.lastInsertRowid)
+    const plan = {
+      ...row,
+      features: row.features ? JSON.parse(row.features) : [],
+      is_active: Boolean(row.is_active),
+    }
+    return c.json(plan, 201)
   })
 
   app.put('/api/admin/plans/:id', requireAuth, requireAdmin, async (c) => {
     const id = Number(c.req.param('id'))
+    const existing = db.prepare('SELECT * FROM plans WHERE id=?').get(id)
+    if (!existing) return c.json({ error: 'not_found' }, 404)
     const body = await c.req.json()
-    const { name, price_cents, period_days, traffic_limit_gb, features = [], is_active = 1 } = body || {}
-    if (!name || !price_cents || price_cents <= 0 || !period_days || period_days < 1) {
-      return c.json({ error: 'invalid_input' }, 400)
+    const updates: string[] = []
+    const params: any[] = []
+
+    if (body.name !== undefined) {
+      if (!body.name || body.name.length < 1 || body.name.length > 100) {
+        return c.json({ error: 'invalid_name', field: 'name' }, 400)
+      }
+      updates.push('name=?')
+      params.push(body.name)
     }
-    if (traffic_limit_gb != null && traffic_limit_gb < 0) {
-      return c.json({ error: 'invalid_input' }, 400)
+    if (body.price_cents !== undefined) {
+      if (!Number.isInteger(body.price_cents) || body.price_cents <= 0) {
+        return c.json({ error: 'invalid_price', field: 'price_cents' }, 400)
+      }
+      updates.push('price_cents=?')
+      params.push(body.price_cents)
     }
-    db.prepare(
-      'UPDATE plans SET name=?, price_cents=?, period_days=?, traffic_limit_gb=?, features=?, is_active=? WHERE id=?'
-    ).run(
-      name,
-      price_cents,
-      period_days,
-      traffic_limit_gb ?? null,
-      JSON.stringify(features),
-      is_active ? 1 : 0,
-      id
-    )
-    return c.json({ ok: true })
+    if (body.period_days !== undefined) {
+      if (!Number.isInteger(body.period_days) || body.period_days < 1) {
+        return c.json({ error: 'invalid_period', field: 'period_days' }, 400)
+      }
+      updates.push('period_days=?')
+      params.push(body.period_days)
+    }
+    if (body.traffic_limit_gb !== undefined) {
+      if (body.traffic_limit_gb != null && (!Number.isInteger(body.traffic_limit_gb) || body.traffic_limit_gb < 0)) {
+        return c.json({ error: 'invalid_traffic', field: 'traffic_limit_gb' }, 400)
+      }
+      updates.push('traffic_limit_gb=?')
+      params.push(body.traffic_limit_gb ?? null)
+    }
+    if (body.features !== undefined) {
+      if (body.features != null && !Array.isArray(body.features)) {
+        return c.json({ error: 'invalid_features', field: 'features' }, 400)
+      }
+      updates.push('features=?')
+      params.push(body.features ? JSON.stringify(body.features) : null)
+    }
+    if (body.is_active !== undefined) {
+      updates.push('is_active=?')
+      params.push(body.is_active ? 1 : 0)
+    }
+    if (updates.length) {
+      db.prepare(`UPDATE plans SET ${updates.join(', ')} WHERE id=?`).run(...params, id)
+    }
+    const row = db.prepare('SELECT * FROM plans WHERE id=?').get(id)
+    const plan = {
+      ...row,
+      features: row.features ? JSON.parse(row.features) : [],
+      is_active: Boolean(row.is_active),
+    }
+    return c.json(plan)
   })
 
   app.delete('/api/admin/plans/:id', requireAuth, requireAdmin, (c) => {
     const id = Number(c.req.param('id'))
     db.prepare('UPDATE plans SET is_active=0 WHERE id=?').run(id)
+    return c.json({ ok: true })
+  })
+
+  app.post('/api/admin/plans/:id/activate', requireAuth, requireAdmin, (c) => {
+    const id = Number(c.req.param('id'))
+    db.prepare('UPDATE plans SET is_active=1 WHERE id=?').run(id)
     return c.json({ ok: true })
   })
 }

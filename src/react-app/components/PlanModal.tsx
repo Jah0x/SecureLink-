@@ -9,6 +9,7 @@ interface VpnPlan {
   traffic_limit_gb: number | null;
   features: string[];
   is_active: boolean;
+  created_at: string;
 }
 
 interface VpnPlanForm {
@@ -63,6 +64,22 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.name.length < 1 || formData.name.length > 100) {
+      alert('Название должно быть от 1 до 100 символов');
+      return;
+    }
+    if (formData.price_rub <= 0) {
+      alert('Цена должна быть больше 0');
+      return;
+    }
+    if (formData.period_days < 1) {
+      alert('Период должен быть не менее 1 дня');
+      return;
+    }
+    if (formData.traffic_limit_gb != null && formData.traffic_limit_gb < 0) {
+      alert('Лимит трафика должен быть 0 или больше');
+      return;
+    }
     onSave(formData);
   };
 
