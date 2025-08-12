@@ -1,7 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
 interface User {
+  id: number;
   email: string;
+  role: string;
+  created_at: string;
   [key: string]: unknown;
 }
 

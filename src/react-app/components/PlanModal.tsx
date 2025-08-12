@@ -4,22 +4,20 @@ import { X } from 'lucide-react';
 interface VpnPlan {
   id: number;
   name: string;
-  duration_months: number;
-  price_rub: number;
-  data_limit_gb: number | null;
-  max_connections: number;
-  description: string;
+  price_cents: number;
+  period_days: number;
+  traffic_limit_gb: number | null;
+  features: string[];
   is_active: boolean;
 }
 
 interface VpnPlanForm {
   id?: number;
   name: string;
-  duration_months: number;
   price_rub: number;
-  data_limit_gb: number | null;
-  max_connections: number;
-  description: string;
+  period_days: number;
+  traffic_limit_gb: number | null;
+  features: string;
   is_active: boolean;
 }
 
@@ -33,27 +31,33 @@ interface PlanModalProps {
 export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalProps) {
   const [formData, setFormData] = useState<VpnPlanForm>({
     name: '',
-    duration_months: 1,
     price_rub: 0,
-    data_limit_gb: null,
-    max_connections: 5,
-    description: '',
-    is_active: true
+    period_days: 30,
+    traffic_limit_gb: null,
+    features: '',
+    is_active: true,
   });
 
   useEffect(() => {
     if (plan) {
-      setFormData({ ...plan });
+      setFormData({
+        id: plan.id,
+        name: plan.name,
+        price_rub: plan.price_cents / 100,
+        period_days: plan.period_days,
+        traffic_limit_gb: plan.traffic_limit_gb,
+        features: plan.features.join(', '),
+        is_active: plan.is_active,
+      })
     } else {
       setFormData({
         name: '',
-        duration_months: 1,
         price_rub: 0,
-        data_limit_gb: null,
-        max_connections: 5,
-        description: '',
-        is_active: true
-      });
+        period_days: 30,
+        traffic_limit_gb: null,
+        features: '',
+        is_active: true,
+      })
     }
   }, [plan]);
 
@@ -93,28 +97,16 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Описание
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={2}
-            />
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Срок (месяцев)
+                Период (дней)
               </label>
               <input
                 type="number"
                 min="1"
-                value={formData.duration_months}
-                onChange={(e) => setFormData({ ...formData, duration_months: parseInt(e.target.value) })}
+                value={formData.period_days}
+                onChange={(e) => setFormData({ ...formData, period_days: parseInt(e.target.value) })}
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -143,29 +135,29 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
               <input
                 type="number"
                 min="0"
-                value={formData.data_limit_gb || ''}
-                onChange={(e) => setFormData({ 
-                  ...formData, 
-                  data_limit_gb: e.target.value ? parseInt(e.target.value) : null 
-                })}
+                value={formData.traffic_limit_gb ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    traffic_limit_gb: e.target.value ? parseInt(e.target.value) : null,
+                  })
+                }
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Безлимит"
               />
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Макс. подключений
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={formData.max_connections}
-                onChange={(e) => setFormData({ ...formData, max_connections: parseInt(e.target.value) })}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Фичи (через запятую)
+            </label>
+            <textarea
+              value={formData.features}
+              onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={2}
+            />
           </div>
 
           <div className="flex items-center">

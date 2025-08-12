@@ -11,22 +11,20 @@ import MarzbanStatsCard from '@/react-app/components/MarzbanStatsCard';
 interface VpnPlan {
   id: number;
   name: string;
-  duration_months: number;
-  price_rub: number;
-  data_limit_gb: number | null;
-  max_connections: number;
-  description: string;
+  price_cents: number;
+  period_days: number;
+  traffic_limit_gb: number | null;
+  features: string[];
   is_active: boolean;
 }
 
 interface VpnPlanForm {
   id?: number;
   name: string;
-  duration_months: number;
   price_rub: number;
-  data_limit_gb: number | null;
-  max_connections: number;
-  description: string;
+  period_days: number;
+  traffic_limit_gb: number | null;
+  features: string;
   is_active: boolean;
 }
 
@@ -71,28 +69,18 @@ export default function Admin() {
 
   useEffect(() => {
     if (!user) {
-      navigate('/');
+      navigate('/login');
       return;
     }
-
-    const checkAdminStatus = async () => {
-      try {
-        const response = await fetch('/api/admin/check');
-        if (response.ok) {
-          setIsAdmin(true);
-          await fetchData();
-        } else {
-          navigate('/dashboard');
-        }
-      } catch (error) {
-        console.error('Admin check failed:', error);
-        navigate('/dashboard');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAdminStatus();
+    if (user.role !== 'admin') {
+      setLoading(false);
+      return;
+    }
+    setIsAdmin(true);
+    (async () => {
+      await fetchData();
+      setLoading(false);
+    })();
   }, [user, navigate]);
 
   const fetchData = async () => {
@@ -127,13 +115,22 @@ export default function Admin() {
       const isEditing = editingPlan && editingPlan.id;
       const url = isEditing ? `/api/admin/plans/${editingPlan.id}` : '/api/admin/plans';
       const method = isEditing ? 'PUT' : 'POST';
-
+      const payload = {
+        name: planData.name,
+        price_cents: Math.round(planData.price_rub * 100),
+        period_days: planData.period_days,
+        traffic_limit_gb: planData.traffic_limit_gb,
+        features: planData.features
+          ? planData.features.split(',').map((f) => f.trim()).filter(Boolean)
+          : [],
+        is_active: planData.is_active,
+      };
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(planData),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -221,12 +218,12 @@ export default function Admin() {
     return new Date(dateStr).toLocaleDateString('ru-RU');
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (priceCents: number) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
       minimumFractionDigits: 0,
-    }).format(price);
+    }).format(priceCents / 100);
   };
 
   if (loading) {
@@ -429,10 +426,10 @@ export default function Admin() {
                 <thead>
                   <tr className="border-b border-slate-700">
                     <th className="text-left p-4 text-slate-300 font-medium">Название</th>
-                    <th className="text-left p-4 text-slate-300 font-medium">Срок</th>
+                    <th className="text-left p-4 text-slate-300 font-medium">Период (дней)</th>
                     <th className="text-left p-4 text-slate-300 font-medium">Цена</th>
                     <th className="text-left p-4 text-slate-300 font-medium">Трафик</th>
-                    <th className="text-left p-4 text-slate-300 font-medium">Подключения</th>
+                    <th className="text-left p-4 text-slate-300 font-medium">Фичи</th>
                     <th className="text-left p-4 text-slate-300 font-medium">Статус</th>
                     <th className="text-left p-4 text-slate-300 font-medium">Действия</th>
                   </tr>
@@ -442,19 +439,18 @@ export default function Admin() {
                     <tr key={plan.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
                       <td className="p-4">
                         <div className="text-white font-medium">{plan.name}</div>
-                        <div className="text-slate-400 text-sm">{plan.description}</div>
                       </td>
                       <td className="p-4 text-slate-300">
-                        {plan.duration_months} мес.
+                        {plan.period_days}
                       </td>
                       <td className="p-4 text-slate-300">
-                        {formatPrice(plan.price_rub)}
+                        {formatPrice(plan.price_cents)}
                       </td>
                       <td className="p-4 text-slate-300">
-                        {plan.data_limit_gb ? `${plan.data_limit_gb} ГБ` : 'Безлимит'}
+                        {plan.traffic_limit_gb ? `${plan.traffic_limit_gb} ГБ` : 'Безлимит'}
                       </td>
                       <td className="p-4 text-slate-300">
-                        {plan.max_connections}
+                        {plan.features.join(', ')}
                       </td>
                       <td className="p-4">
                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${

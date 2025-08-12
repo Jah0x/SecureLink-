@@ -2,16 +2,15 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/auth';
 import { useNavigate } from 'react-router';
 import Header from '@/react-app/components/Header';
-import { Check, Zap, Shield, Globe } from 'lucide-react';
+import { Check, Shield } from 'lucide-react';
 
 interface VpnPlan {
   id: number;
   name: string;
-  duration_months: number;
-  price_rub: number;
-  data_limit_gb: number | null;
-  max_connections: number;
-  description: string;
+  price_cents: number;
+  period_days: number;
+  traffic_limit_gb: number | null;
+  features: string[];
   is_active: boolean;
 }
 
@@ -74,16 +73,17 @@ export default function Pricing() {
     }
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (priceCents: number) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
       minimumFractionDigits: 0,
-    }).format(price);
+    }).format(priceCents / 100);
   };
 
-  const getPopularBadge = (duration: number) => {
-    return duration === 6 ? (
+  const getPopularBadge = (periodDays: number) => {
+    const months = periodDays / 30;
+    return months === 6 ? (
       <div className="absolute -top-3 -right-3 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
         Популярный
       </div>
@@ -123,39 +123,27 @@ export default function Pricing() {
               key={plan.id}
               className="relative bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-slate-600 transition-all duration-300 group hover:shadow-2xl hover:shadow-blue-500/10"
             >
-              {getPopularBadge(plan.duration_months)}
-              
+              {getPopularBadge(plan.period_days)}
+
               <div className="text-center mb-8">
                 <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
-                <div className="text-3xl font-bold text-white mb-1">
-                  {formatPrice(plan.price_rub)}
-                </div>
-                <p className="text-slate-400 text-sm">
-                  {formatPrice(plan.price_rub / plan.duration_months)} / месяц
-                </p>
+                <div className="text-3xl font-bold text-white mb-1">{formatPrice(plan.price_cents)}</div>
+                <p className="text-slate-400 text-sm">{plan.period_days} дн.</p>
               </div>
 
               <div className="space-y-4 mb-8">
                 <div className="flex items-center space-x-3">
                   <Check className="w-5 h-5 text-green-400" />
                   <span className="text-slate-300">
-                    {plan.data_limit_gb ? `${plan.data_limit_gb} ГБ трафика` : 'Безлимитный трафик'}
+                    {plan.traffic_limit_gb ? `${plan.traffic_limit_gb} ГБ трафика` : 'Безлимитный трафик'}
                   </span>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <Zap className="w-5 h-5 text-blue-400" />
-                  <span className="text-slate-300">
-                    До {plan.max_connections} подключений
-                  </span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Globe className="w-5 h-5 text-purple-400" />
-                  <span className="text-slate-300">Серверы по всему миру</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Shield className="w-5 h-5 text-green-400" />
-                  <span className="text-slate-300">Военное шифрование</span>
-                </div>
+                {plan.features.map((f) => (
+                  <div key={f} className="flex items-center space-x-3">
+                    <Shield className="w-5 h-5 text-blue-400" />
+                    <span className="text-slate-300">{f}</span>
+                  </div>
+                ))}
               </div>
 
               <button

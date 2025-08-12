@@ -41,6 +41,8 @@ npm run build && npm run smoke:head
 - `SESSION_COOKIE_SAMESITE` – политика `SameSite`
 - `SESSION_COOKIE_MAXAGE` – время жизни куки в секундах
 - `SESSION_SECRET` – секрет подписи JWT‑сессии
+- `ADMIN_EMAILS` – список e-mail администраторов через запятую
+- `FIRST_USER_ADMIN` – если `true`, первый зарегистрированный пользователь становится администратором
 - `NEXT_PUBLIC_API_BASE_URL` – базовый URL API (обычно `https://dashboard.zerologsvpn.com`)
 
 Проект ожидает, что в каталоге `public/` будут размещены локальные иконки и изображения для Open Graph. Из-за политики репозитория бинарные файлы не хранятся в Git, поэтому добавьте собственные изображения перед деплоем.
