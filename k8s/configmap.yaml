@@ -5,5 +5,7 @@ metadata:
 data:
   bootstrap.sh: |
     #!/bin/sh
-    npx --yes drizzle-kit@latest push --config ./drizzle.config.ts || true
-    node dist/worker/index.js
+    # авто-миграции (postgres/sqlite), без интерактива
+    npx -y drizzle-kit@latest push --config ./drizzle.config.ts || true
+
+    exec npx -y tsx /app/_runner.ts

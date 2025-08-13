@@ -49,6 +49,31 @@ npm run build && npm run smoke:head
 
 Проект ожидает, что в каталоге `public/` будут размещены локальные иконки и изображения для Open Graph. Из-за политики репозитория бинарные файлы не хранятся в Git, поэтому добавьте собственные изображения перед деплоем.
 
+## Миграции БД
+
+```bash
+npm run db:gen   # генерация SQL из схемы
+npm run db:push  # применение миграций
+```
+
+При старте контейнера `bootstrap.sh` также выполняет `drizzle-kit push`, поэтому недостающие миграции накатываются автоматически.
+
+## Сидер администратора
+
+При запуске `_runner.ts` вызывается `seedFirstAdmin`. Если таблица `users` пуста, создаётся администратор из переменных `FIRST_ADMIN_EMAIL` и `FIRST_ADMIN_PASSWORD`. Повторные запуски сидера не создают дубликатов.
+
+### Пример `.env`
+
+```env
+DB=postgresql://securelink:password@postgres:5432/securelink?sslmode=disable
+AUTH_MODE=internal
+SESSION_COOKIE_DOMAIN=.zerologsvpn.com
+SESSION_COOKIE_SECURE=true
+SESSION_COOKIE_SAMESITE=None
+FIRST_ADMIN_EMAIL=admin@example.com
+FIRST_ADMIN_PASSWORD=change_me
+```
+
 ## Kubernetes
 
 Манифест для развертывания находится в каталоге `k8s/`. Примените его командой:
@@ -61,7 +86,7 @@ kubectl apply -f k8s/deployment.yaml
 
 В манифесте настроены liveness/readiness‑пробы на `GET /healthz` порта `5173`, Service типа `NodePort` пробрасывает порт `30082` на тот же порт контейнера.
 
-`bootstrap.sh` из ConfigMap автоматически прогоняет миграции командой `npx --yes drizzle-kit@latest push --config ./drizzle.config.ts || true`, поэтому повторные рестарты узла не приводят к ошибкам из-за отсутствующих таблиц.
+`bootstrap.sh` из ConfigMap автоматически прогоняет миграции командой `npx -y drizzle-kit@latest push --config ./drizzle.config.ts || true` и стартует приложение через `tsx` (`exec npx -y tsx /app/_runner.ts`), поэтому повторные рестарты узла не приводят к ошибкам из-за отсутствующих таблиц.
 
 ## Смоук‑тесты
 
