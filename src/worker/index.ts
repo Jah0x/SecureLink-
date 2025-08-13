@@ -7,11 +7,14 @@ import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import { db } from '@/db/client'
 import { users, plans, affiliates, affiliateClicks } from '@/db/schema'
+import { seedFirstAdmin } from '@/db/seedAdmin'
 import { eq, inArray, desc, sql } from 'drizzle-orm'
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
 
 const app = new Hono()
+
+await seedFirstAdmin()
 
 // ---------- utils/env ----------
 const AUTH_BASE = process.env.AUTH_BASE_URL
@@ -238,6 +241,24 @@ if (AUTH_MODE === 'proxy') {
       .from(users)
       .orderBy(desc(users.createdAt))
     return c.json(rows)
+  })
+
+  app.post('/api/admin/users', requireAuth, requireAdmin, async (c) => {
+    const body = await c.req.json()
+    const { email, password, role = 'user' } = body || {}
+    if (!email || !password) return c.json({ error: 'invalid_input' }, 400)
+    const existing = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
+    if (existing.length) return c.json({ error: 'user_exists' }, 400)
+    const passwordHash = await argon2.hash(password, { type: argon2.argon2id })
+    const inserted = await db
+      .insert(users)
+      .values({ email, passwordHash, role })
+      .returning({ id: users.id, email: users.email, role: users.role, createdAt: users.createdAt })
+    return c.json(inserted[0], 201)
   })
 
   app.get('/api/plans', async (c) => {
