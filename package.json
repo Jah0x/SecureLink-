@@ -50,7 +50,7 @@
     "dev": "concurrently -k \"tsx src/worker/index.ts\" \"vite --host 0.0.0.0 --port 5173\"",
     "lint": "eslint .",
     "smoke:head": "tsx scripts/smoke-head.ts",
-    "db:push": "drizzle-kit push",
+    "db:push": "drizzle-kit push --config ./drizzle.config.ts",
     "db:gen": "drizzle-kit generate"
   }
 }

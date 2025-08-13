@@ -44,6 +44,19 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<VpnPlan | null>(null);
+  const handleAddUser = async () => {
+    const email = prompt('Email пользователя');
+    if (!email) return;
+    const password = prompt('Пароль пользователя');
+    if (!password) return;
+    try {
+      await apiFetch('/api/admin/users', { method: 'POST', body: JSON.stringify({ email, password }) });
+      await fetchData();
+    } catch (e) {
+      console.error('Failed to create user:', e);
+      alert('Ошибка при создании пользователя');
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -66,7 +79,12 @@ export default function Admin() {
       setUsers(usersData as AdminUser[]);
       setPlans(plansData as VpnPlan[]);
     } catch (e) {
-      console.error('Failed to fetch admin data:', e);
+      if ((e as Error).message === '401') {
+        alert('Сессия истекла');
+        navigate('/login');
+      } else {
+        console.error('Failed to fetch admin data:', e);
+      }
     }
   };
 
@@ -191,10 +209,17 @@ export default function Admin() {
 
         {activeTab === 'users' && (
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700">
-            <div className="p-6 border-b border-slate-700">
+            <div className="p-6 border-b border-slate-700 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-white">
                 Пользователи ({users.length})
               </h2>
+              <button
+                onClick={handleAddUser}
+                className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Добавить пользователя</span>
+              </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">

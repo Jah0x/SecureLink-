@@ -13,10 +13,13 @@ spec:
     metadata:
       labels:
         app: securelink
+      annotations:
+        kubectl.kubernetes.io/default-container: securelink
     spec:
       containers:
         - name: securelink
           image: securelink:latest
+          command: ["/bin/sh", "/config/bootstrap.sh"]
           ports:
             - containerPort: 5173
           env:
@@ -24,6 +27,21 @@ spec:
               value: "http://auth:8000"
             - name: NEXT_PUBLIC_API_BASE_URL
               value: "https://dashboard.zerologsvpn.com"
+            - name: DB
+              valueFrom:
+                secretKeyRef:
+                  name: securelink-secret
+                  key: DB
+            - name: FIRST_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: securelink-secret
+                  key: FIRST_ADMIN_EMAIL
+            - name: FIRST_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: securelink-secret
+                  key: FIRST_ADMIN_PASSWORD
           readinessProbe:
             httpGet:
               path: /healthz
@@ -36,6 +54,14 @@ spec:
               port: 5173
             initialDelaySeconds: 10
             periodSeconds: 10
+          volumeMounts:
+            - name: bootstrap
+              mountPath: /config
+      volumes:
+        - name: bootstrap
+          configMap:
+            name: securelink-bootstrap
+            defaultMode: 0755
 ---
 apiVersion: v1
 kind: Service

@@ -44,6 +44,8 @@ npm run build && npm run smoke:head
 - `ADMIN_EMAILS` – список e-mail администраторов через запятую
 - `FIRST_USER_ADMIN` – если `true`, первый зарегистрированный пользователь становится администратором
 - `NEXT_PUBLIC_API_BASE_URL` – базовый URL API (обычно `https://dashboard.zerologsvpn.com`)
+- `DB` – строка подключения к базе данных (`postgresql://` или `sqlite:///`)
+- `FIRST_ADMIN_EMAIL` и `FIRST_ADMIN_PASSWORD` – учётные данные первого администратора; запись создаётся автоматически, если таблица `users` пустая
 
 Проект ожидает, что в каталоге `public/` будут размещены локальные иконки и изображения для Open Graph. Из-за политики репозитория бинарные файлы не хранятся в Git, поэтому добавьте собственные изображения перед деплоем.
 
@@ -52,10 +54,14 @@ npm run build && npm run smoke:head
 Манифест для развертывания находится в каталоге `k8s/`. Примените его командой:
 
 ```bash
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/secret.yaml
 kubectl apply -f k8s/deployment.yaml
 ```
 
 В манифесте настроены liveness/readiness‑пробы на `GET /healthz` порта `5173`, Service типа `NodePort` пробрасывает порт `30082` на тот же порт контейнера.
+
+`bootstrap.sh` из ConfigMap автоматически прогоняет миграции командой `npx --yes drizzle-kit@latest push --config ./drizzle.config.ts || true`, поэтому повторные рестарты узла не приводят к ошибкам из-за отсутствующих таблиц.
 
 ## Смоук‑тесты
 
