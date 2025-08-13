@@ -8,9 +8,12 @@
     "@hono/zod-validator": "^0.5.0",
     "argon2": "^0.44.0",
     "better-sqlite3": "^12.2.0",
+    "drizzle-kit": "^0.24.0",
+    "drizzle-orm": "^0.36.0",
     "hono": "4.7.7",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.510.0",
+    "pg": "^8.12.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-router": "^7.5.3",
@@ -19,7 +22,9 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.9.6",
     "@eslint/js": "9.25.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "22.14.1",
+    "@types/pg": "^8.15.5",
     "@types/react": "19.0.10",
     "@types/react-dom": "19.0.4",
     "@vitejs/plugin-react": "4.4.1",
@@ -44,6 +49,8 @@
     "check": "tsc && vite build && wrangler deploy --dry-run",
     "dev": "concurrently -k \"tsx src/worker/index.ts\" \"vite --host 0.0.0.0 --port 5173\"",
     "lint": "eslint .",
-    "smoke:head": "tsx scripts/smoke-head.ts"
+    "smoke:head": "tsx scripts/smoke-head.ts",
+    "db:push": "drizzle-kit push",
+    "db:gen": "drizzle-kit generate"
   }
 }
