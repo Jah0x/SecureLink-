@@ -6,6 +6,7 @@ import Pricing from "@/react-app/pages/Pricing";
 import Earnings from "@/react-app/pages/Earnings";
 import Admin from "@/react-app/pages/Admin";
 import Register from "@/react-app/pages/Register";
+import Privacy from "@/pages/privacy";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/earnings" element={<Earnings />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/privacy" element={<Privacy />} />
         </Routes>
       </Router>
     </AuthProvider>
