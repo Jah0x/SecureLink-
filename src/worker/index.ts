@@ -11,6 +11,8 @@ import { seedFirstAdmin } from '@/db/seedAdmin'
 import { eq, inArray, desc, sql, and, gte, lte } from 'drizzle-orm'
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
+import { migrate as migratePg } from 'drizzle-orm/node-postgres/migrator'
+import { migrate as migrateSqlite } from 'drizzle-orm/better-sqlite3/migrator'
 
 const app = new Hono()
 
@@ -22,6 +24,13 @@ app.onError((err, c) => {
   })
   return c.json({ type: 'about:blank', title: 'Internal Server Error', status: 500, code: 'internal_error' }, 500)
 })
+
+const DB_URL = process.env.DB || ''
+if (DB_URL.startsWith('postgres')) {
+  await migratePg(db, { migrationsFolder: './drizzle' })
+} else {
+  await migrateSqlite(db, { migrationsFolder: './drizzle' })
+}
 
 await seedFirstAdmin()
 

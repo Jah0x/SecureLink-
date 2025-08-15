@@ -42,3 +42,6 @@
 - Перенесён `drizzle-kit` в dev-зависимости, добавлены скрипты `db:gen`/`db:push`, ConfigMap запускает миграции и приложение через `tsx` и `_runner.ts`, пример `.env` теперь использует PostgreSQL и сидер первого администратора документирован.
 - Добавлены таблицы `plan_features`, `affiliate_links`, `affiliate_stats` с индексами по (`user_id`, `created_at`) и (`ref_id`, `created_at`); эндпоинты `/api/admin/plans` и `/api/aff/me` возвращают пустые ответы без ошибок, добавлены `/api/aff/stats` и список аффилиатов в админке.
 - Переписаны миграции: заменены устаревшие таблицы `vpn_*` на новую схему `users`, `plans`, `plan_features`, `subscriptions`, `affiliates`, `affiliate_clicks`, `affiliate_links`, `affiliate_stats` в `drizzle/0000_initial.sql`.
+
+- При старте воркера теперь автоматически выполняются миграции Drizzle, что гарантирует создание таблиц тарифов и реферальной системы до сидирования первого администратора.
+
