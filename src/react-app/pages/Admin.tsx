@@ -3,7 +3,7 @@ import { useAuth } from '@/auth';
 import { useNavigate } from 'react-router';
 import Header from '@/react-app/components/Header';
 import PlanModal from '@/react-app/components/PlanModal';
-import { Users, CreditCard, Plus, Edit, Ban, Check } from 'lucide-react';
+import { Users, CreditCard, Plus, Edit, Ban, Check, Link as LinkIcon } from 'lucide-react';
 import { apiFetch } from '@/react-app/api';
 
 interface VpnPlan {
@@ -37,9 +37,11 @@ interface AdminUser {
 export default function Admin() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'plans'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'affiliates'>('users');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [plans, setPlans] = useState<VpnPlan[]>([]);
+  const [affiliatesList, setAffiliatesList] = useState<any[]>([]);
+  const REF_ENABLED = import.meta.env.VITE_FEATURE_REFERRALS !== 'false';
   const [planFilter, setPlanFilter] = useState<'all' | '1' | '0'>('all');
   const [loading, setLoading] = useState(true);
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -72,12 +74,15 @@ export default function Admin() {
 
   const fetchData = async () => {
     try {
-      const [usersData, plansData] = await Promise.all([
+      const reqs: Promise<any>[] = [
         apiFetch('/api/admin/users'),
         apiFetch(`/api/admin/plans?active=${planFilter}`),
-      ]);
+      ];
+      if (REF_ENABLED) reqs.push(apiFetch('/api/admin/affiliates'));
+      const [usersData, plansData, affData] = await Promise.all(reqs);
       setUsers(usersData as AdminUser[]);
       setPlans(plansData as VpnPlan[]);
+      setAffiliatesList((affData || []) as any[]);
     } catch (e) {
       if ((e as Error).message === '401') {
         alert('Сессия истекла');
@@ -205,6 +210,19 @@ export default function Admin() {
             <CreditCard className="w-4 h-4" />
             <span>Тарифные планы</span>
           </button>
+          {REF_ENABLED && (
+            <button
+              onClick={() => setActiveTab('affiliates')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'affiliates'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              <LinkIcon className="w-4 h-4" />
+              <span>Реферальная система</span>
+            </button>
+          )}
         </div>
 
         {activeTab === 'users' && (
@@ -339,6 +357,33 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {REF_ENABLED && activeTab === 'affiliates' && (
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700">
+            {affiliatesList.length === 0 ? (
+              <div className="p-6 text-center text-slate-400">Данных пока нет</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-700">
+                      <th className="text-left p-4 text-slate-300 font-medium">Код</th>
+                      <th className="text-left p-4 text-slate-300 font-medium">Процент</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {affiliatesList.map((a) => (
+                      <tr key={a.id} className="border-b border-slate-700/50">
+                        <td className="p-4 text-white">{a.code}</td>
+                        <td className="p-4 text-slate-300">{a.percent}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </main>

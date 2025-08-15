@@ -6,13 +6,22 @@ import { setCookie, getCookie, deleteCookie } from 'hono/cookie'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import { db } from '@/db/client'
-import { users, plans, affiliates, affiliateClicks } from '@/db/schema'
+import { users, plans, planFeatures, affiliates, affiliateClicks, affiliateLinks, affiliateStats } from '@/db/schema'
 import { seedFirstAdmin } from '@/db/seedAdmin'
-import { eq, inArray, desc, sql } from 'drizzle-orm'
+import { eq, inArray, desc, sql, and, gte, lte } from 'drizzle-orm'
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
 
 const app = new Hono()
+
+app.onError((err, c) => {
+  console.error('API error', {
+    method: c.req.method,
+    url: c.req.url,
+    stack: err.stack,
+  })
+  return c.json({ type: 'about:blank', title: 'Internal Server Error', status: 500, code: 'internal_error' }, 500)
+})
 
 await seedFirstAdmin()
 
@@ -34,6 +43,7 @@ const SESSION_COOKIE_MAXAGE = Number(process.env.SESSION_COOKIE_MAXAGE || 60*60*
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev_secret'
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
 const FIRST_USER_ADMIN = String(process.env.FIRST_USER_ADMIN || 'false') === 'true'
+const FEATURE_REFERRALS = String(process.env.FEATURE_REFERRALS || 'true') === 'true'
 
 function authUrl(path: string) {
   if (!AUTH_BASE) throw new Error('AUTH_BASE_URL is not set')
@@ -347,46 +357,88 @@ if (AUTH_MODE === 'proxy') {
     return c.json({ ok: true })
   })
 
-  app.get('/r/:code', async (c) => {
-    const code = c.req.param('code')
-    const rows = await db.select().from(affiliates).where(eq(affiliates.code, code)).limit(1)
-    const row = rows[0]
-    if (row) {
-      await db.insert(affiliateClicks).values({ affiliateId: row.id })
-      setCookie(c, 'aff_code', code, {
-        path: '/',
-        maxAge: 60 * 60 * 24 * 30,
-        sameSite: 'None',
-        secure: true,
-      })
-      return c.redirect('/register')
-    }
-    return c.redirect('/pricing')
-  })
-
-  app.get('/api/aff/me', requireAuth, async (c) => {
-    const user: any = c.get('user')
-    let rows = await db.select().from(affiliates).where(eq(affiliates.ownerUserId, user.sub)).limit(1)
-    let aff = rows[0]
-    if (!aff) {
-      const code = await genAffCode()
-      const inserted = await db
-        .insert(affiliates)
-        .values({ ownerUserId: user.sub, code })
-        .returning()
-      aff = inserted[0]
-    }
-    const clicksRes = await db
-      .select({ cnt: sql<number>`count(*)` })
-      .from(affiliateClicks)
-      .where(eq(affiliateClicks.affiliateId, aff.id))
-    const clicks = clicksRes[0]?.cnt || 0
-    return c.json({
-      code: aff.code,
-      share_url: `https://dashboard.zerologsvpn.com/r/${aff.code}`,
-      stats: { clicks, signups: 0, earnings_cents: 0 },
+  if (FEATURE_REFERRALS) {
+    app.get('/api/admin/affiliates', requireAuth, requireAdmin, async (c) => {
+      const rows = await db.select().from(affiliates).orderBy(desc(affiliates.id))
+      return c.json(rows)
     })
-  })
+
+    app.get('/r/:code', async (c) => {
+      const code = c.req.param('code')
+      const rows = await db.select().from(affiliates).where(eq(affiliates.code, code)).limit(1)
+      const row = rows[0]
+      if (row) {
+        await db.insert(affiliateClicks).values({ affiliateId: row.id })
+        setCookie(c, 'aff_code', code, {
+          path: '/',
+          maxAge: 60 * 60 * 24 * 30,
+          sameSite: 'None',
+          secure: true,
+        })
+        return c.redirect('/register')
+      }
+      return c.redirect('/pricing')
+    })
+
+    app.get('/api/aff/me', requireAuth, async (c) => {
+      const user: any = c.get('user')
+      let rows = await db.select().from(affiliates).where(eq(affiliates.ownerUserId, user.sub)).limit(1)
+      let aff = rows[0]
+      if (!aff) {
+        const code = await genAffCode()
+        const inserted = await db
+          .insert(affiliates)
+          .values({ ownerUserId: user.sub, code })
+          .returning()
+        aff = inserted[0]
+      }
+      const clicksRes = await db
+        .select({ cnt: sql<number>`count(*)` })
+        .from(affiliateClicks)
+        .where(eq(affiliateClicks.affiliateId, aff.id))
+      const clicks = clicksRes[0]?.cnt || 0
+      return c.json({
+        code: aff.code,
+        share_url: `https://dashboard.zerologsvpn.com/r/${aff.code}`,
+        stats: { clicks, signups: 0, earnings_cents: 0 },
+      })
+    })
+
+    app.get('/api/aff/stats', requireAuth, async (c) => {
+      const user: any = c.get('user')
+      const fromStr = c.req.query('from')
+      const toStr = c.req.query('to')
+      const offset = Number(c.req.query('offset') || '0')
+      const limit = Number(c.req.query('limit') || '30')
+      const from = fromStr ? new Date(fromStr) : new Date(Date.now() - 1000 * 60 * 60 * 24 * 30)
+      const to = toStr ? new Date(toStr) : new Date()
+      const affRows = await db
+        .select()
+        .from(affiliates)
+        .where(eq(affiliates.ownerUserId, user.sub))
+        .limit(1)
+      const aff = affRows[0]
+      if (!aff) return c.json([])
+      const rows = await db
+        .select({
+          day: sql`date(${affiliateStats.createdAt})`,
+          earnings: sql<number>`sum(${affiliateStats.earningsCents})`,
+        })
+        .from(affiliateStats)
+        .where(
+          and(
+            eq(affiliateStats.refId, aff.id),
+            gte(affiliateStats.createdAt, from),
+            lte(affiliateStats.createdAt, to)
+          )
+        )
+        .groupBy(sql`date(${affiliateStats.createdAt})`)
+        .orderBy(sql`date(${affiliateStats.createdAt})`)
+        .limit(limit)
+        .offset(offset)
+      return c.json(rows)
+    })
+  }
 }
 
 // ---------- STATIC + SPA ----------

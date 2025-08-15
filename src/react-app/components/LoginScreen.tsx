@@ -1,5 +1,5 @@
 import { useAuth } from '@/auth';
-import { Shield, Lock, Globe, Zap } from 'lucide-react';
+import { Shield, Lock, Zap, Monitor } from 'lucide-react';
 import { useState } from 'react';
 
 export default function LoginScreen() {
@@ -27,15 +27,15 @@ export default function LoginScreen() {
           <div className="space-y-6 mb-8">
             <div className="flex items-center space-x-3">
               <Lock className="w-5 h-5 text-blue-400" />
-              <span className="text-slate-300">Военная шифрование</span>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Globe className="w-5 h-5 text-purple-400" />
-              <span className="text-slate-300">Серверы по всему миру</span>
+              <span className="text-slate-300">Не собираем личные данные</span>
             </div>
             <div className="flex items-center space-x-3">
               <Zap className="w-5 h-5 text-green-400" />
-              <span className="text-slate-300">Высокая скорость</span>
+              <span className="text-slate-300">Нет ограничений по трафику и скорости</span>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Monitor className="w-5 h-5 text-purple-400" />
+              <span className="text-slate-300">Простой запуск на всех платформах</span>
             </div>
           </div>
 
@@ -66,7 +66,7 @@ export default function LoginScreen() {
           </form>
 
           <p className="text-slate-500 text-xs text-center mt-4">
-            Нажимая "Войти", вы соглашаетесь с условиями использования
+            Нажимая "Войти", вы соглашаетесь с <a href="/privacy" className="text-blue-500 hover:underline">Политикой конфиденциальности</a>
           </p>
 
           <p className="text-slate-400 text-center mt-4">

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, index } from "drizzle-orm/pg-core";
 // Если DB=sqlite — Drizzle сам подставит sqlite-диалект по конфигу.
 
 export const users = pgTable("users", {
@@ -14,6 +14,12 @@ export const plans = pgTable("plans", {
   name: text("name").notNull(),
   priceCents: integer("price_cents").notNull(),
   active: boolean("active").notNull().default(true),
+});
+
+export const planFeatures = pgTable("plan_features", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id").notNull().references(() => plans.id, { onDelete: "cascade" }),
+  feature: text("feature").notNull(),
 });
 
 export const subscriptions = pgTable("subscriptions", {
@@ -37,3 +43,25 @@ export const affiliateClicks = pgTable("affiliate_clicks", {
   affiliateId: integer("affiliate_id").notNull().references(() => affiliates.id, { onDelete: "cascade" }),
   ts: timestamp("ts").defaultNow(),
 });
+
+export const affiliateLinks = pgTable("affiliate_links", {
+  id: serial("id").primaryKey(),
+  affiliateId: integer("affiliate_id").notNull().references(() => affiliates.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const affiliateStats = pgTable(
+  "affiliate_stats",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+    refId: integer("ref_id").references(() => affiliates.id, { onDelete: "cascade" }),
+    earningsCents: integer("earnings_cents").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    userCreatedIdx: index("idx_aff_stats_user_created").on(t.userId, t.createdAt),
+    refCreatedIdx: index("idx_aff_stats_ref_created").on(t.refId, t.createdAt),
+  })
+);
