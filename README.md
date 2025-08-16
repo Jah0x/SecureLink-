@@ -56,6 +56,8 @@ npm run db:gen   # генерация SQL из схемы
 npm run db:push  # применение миграций
 ```
 
+Если при выполнении миграций появляется ошибка `Error please install required packages: drizzle-orm`, запустите `npm install` — пакет `drizzle-orm` должен присутствовать в `node_modules`.
+
 При старте контейнера `bootstrap.sh` также выполняет `drizzle-kit push`, поэтому недостающие миграции накатываются автоматически.
 
 ## Сидер администратора
