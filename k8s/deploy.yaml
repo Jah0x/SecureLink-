@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: securelink
+  namespace: securelink
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: securelink
+  template:
+    metadata:
+      labels:
+        app: securelink
+    spec:
+      containers:
+      - name: app
+        image: ghcr.io/your-org/securelink:{{TAG}}
+        ports:
+        - containerPort: 5173
+        env:
+        - name: PORT
+          value: "5173"
+        - name: MIGRATE_ON_BOOT
+          value: "0"
+        - name: MARZBAN_API_URL
+          value: "https://marzban.securesoft.dev"
+        - name: MARZBAN_API_KEY
+          value: "REPLACE_ME"
+        - name: NEXT_PUBLIC_API_BASE_URL
+          value: "https://dashboard.securesoft.dev"
+        - name: SESSION_COOKIE_DOMAIN
+          value: ".securesoft.dev"
+        - name: SESSION_COOKIE_SECURE
+          value: "true"
+        - name: SESSION_COOKIE_SAMESITE
+          value: "None"
+        - name: SESSION_COOKIE_MAXAGE
+          value: "2592000"
+        - name: AUTH_MODE
+          value: "internal"
+        - name: SESSION_SECRET
+          value: "c47d6c8af1049dc316850e7fe9afd0e8df7858656741a10a87c14c5712428d59"
+        - name: ADMIN_EMAILS
+          value: "alfredgrowed@gmail.com"
+        - name: FIRST_USER_ADMIN
+          value: "true"
+        - name: DB
+          valueFrom:
+            secretKeyRef:
+              name: securelink-db
+              key: DB
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 5173
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 12
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 5173
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 12
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 5173
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 120
+      nodeSelector:
+        kubernetes.io/hostname: zerologsvpn.com
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
