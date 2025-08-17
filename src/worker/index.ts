@@ -11,8 +11,8 @@ import { seedFirstAdmin } from '@/db/seedAdmin'
 import { eq, inArray, desc, sql, and, gte, lte } from 'drizzle-orm'
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
-import { migrate as migratePg } from 'drizzle-orm/node-postgres/migrator'
-import { migrate as migrateSqlite } from 'drizzle-orm/better-sqlite3/migrator'
+import { migrate as migratePgOrig } from 'drizzle-orm/node-postgres/migrator'
+import { migrate as migrateSqliteOrig } from 'drizzle-orm/better-sqlite3/migrator'
 
 const app = new Hono()
 
@@ -26,11 +26,33 @@ app.onError((err, c) => {
 })
 
 const DB_URL = process.env.DB || ''
-if (DB_URL.startsWith('postgres')) {
-  await migratePg(db, { migrationsFolder: './drizzle' })
-} else {
-  await migrateSqlite(db, { migrationsFolder: './drizzle' })
+
+const SKIP =
+  process.env.SKIP_RUNTIME_MIGRATIONS === '1' ||
+  process.env.NODE_ENV === 'production'
+
+async function safeMigrate(db: any) {
+  if (SKIP) {
+    console.log('[db] skip runtime migrations by env')
+    return
+  }
+  try {
+    if (DB_URL.startsWith('postgres')) {
+      await migratePgOrig(db, { migrationsFolder: './drizzle' })
+    } else {
+      await migrateSqliteOrig(db, { migrationsFolder: './drizzle' })
+    }
+  } catch (e: any) {
+    const msg = String(e?.message || e)
+    if (e?.code === '42P07' || /already exists/i.test(msg)) {
+      console.log('[db] schema exists -> continue')
+      return
+    }
+    throw e
+  }
 }
+
+await safeMigrate(db)
 
 await seedFirstAdmin()
 
