@@ -46,6 +46,8 @@ npm run build && npm run smoke:head
 - `NEXT_PUBLIC_API_BASE_URL` – базовый URL API (обычно `https://dashboard.zerologsvpn.com`)
 - `DB` – строка подключения к базе данных (`postgresql://` или `sqlite:///`)
 - `FIRST_ADMIN_EMAIL` и `FIRST_ADMIN_PASSWORD` – учётные данные первого администратора; запись создаётся автоматически, если таблица `users` пустая
+- `SKIP_RUNTIME_MIGRATIONS` – пропустить миграции при старте (обычно `1` в проде)
+- `MIGRATE_ON_BOOT` – выполнить миграции и сиды при старте (`0` по умолчанию)
 
 Проект ожидает, что в каталоге `public/` будут размещены локальные иконки и изображения для Open Graph. Из-за политики репозитория бинарные файлы не хранятся в Git, поэтому добавьте собственные изображения перед деплоем.
 
@@ -62,7 +64,7 @@ npm run db:push  # применение миграций
 
 ## Сидер администратора
 
-При запуске `_runner.ts` вызывается `seedFirstAdmin`. Если таблица `users` пуста, создаётся администратор из переменных `FIRST_ADMIN_EMAIL` и `FIRST_ADMIN_PASSWORD`. Повторные запуски сидера не создают дубликатов.
+Миграции и сидер `seedFirstAdmin` выполняются только если при старте установлено `MIGRATE_ON_BOOT=1`. Если таблица `users` пуста, создаётся администратор из переменных `FIRST_ADMIN_EMAIL` и `FIRST_ADMIN_PASSWORD`. Повторные запуски сидера не создают дубликатов.
 
 ### Пример `.env`
 
@@ -88,7 +90,7 @@ kubectl apply -f k8s/deployment.yaml
 
 В манифесте настроены liveness/readiness‑пробы на `GET /healthz` порта `5173`, Service типа `NodePort` пробрасывает порт `30082` на тот же порт контейнера.
 
-`bootstrap.sh` из ConfigMap автоматически прогоняет миграции командой `npx -y drizzle-kit@latest push --config ./drizzle.config.ts || true` и стартует приложение через `tsx` (`exec npx -y tsx /app/_runner.ts`), поэтому повторные рестарты узла не приводят к ошибкам из-за отсутствующих таблиц.
+`bootstrap.sh` из ConfigMap автоматически прогоняет миграции командой `npx -y drizzle-kit@latest push --config ./drizzle.config.ts || true` и стартует приложение через `npm run start` (`exec npm run start`), поэтому повторные рестарты узла не приводят к ошибкам из-за отсутствующих таблиц.
 
 ## Смоук‑тесты
 

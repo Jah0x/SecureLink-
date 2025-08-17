@@ -51,6 +51,7 @@
     "lint": "eslint .",
     "smoke:head": "tsx scripts/smoke-head.ts",
     "db:push": "drizzle-kit push --config ./drizzle.config.ts",
-    "db:gen": "drizzle-kit generate --config ./drizzle.config.ts"
+    "db:gen": "drizzle-kit generate --config ./drizzle.config.ts",
+    "start": "tsx src/_runner.ts"
   }
 }

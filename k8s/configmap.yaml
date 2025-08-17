@@ -8,4 +8,4 @@ data:
     # авто-миграции (postgres/sqlite), без интерактива
     npx -y drizzle-kit@latest push --config ./drizzle.config.ts || true
 
-    exec npx -y tsx /app/_runner.ts
+    exec npm run start
