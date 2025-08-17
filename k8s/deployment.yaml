@@ -42,6 +42,10 @@ spec:
                 secretKeyRef:
                   name: securelink-secret
                   key: FIRST_ADMIN_PASSWORD
+            - name: SKIP_RUNTIME_MIGRATIONS
+              value: "1"
+            - name: MIGRATE_ON_BOOT
+              value: "0"
           readinessProbe:
             httpGet:
               path: /healthz

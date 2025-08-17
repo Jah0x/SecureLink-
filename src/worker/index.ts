@@ -31,7 +31,7 @@ const SKIP =
   process.env.SKIP_RUNTIME_MIGRATIONS === '1' ||
   process.env.NODE_ENV === 'production'
 
-async function safeMigrate(db: any) {
+export async function safeMigrate() {
   if (SKIP) {
     console.log('[db] skip runtime migrations by env')
     return
@@ -50,11 +50,8 @@ async function safeMigrate(db: any) {
     }
     throw e
   }
+  await seedFirstAdmin()
 }
-
-await safeMigrate(db)
-
-await seedFirstAdmin()
 
 // ---------- utils/env ----------
 const AUTH_BASE = process.env.AUTH_BASE_URL
