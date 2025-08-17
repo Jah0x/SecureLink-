@@ -5,14 +5,14 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
-import { db } from '@/db/client'
 import { users, plans, planFeatures, affiliates, affiliateClicks, affiliateLinks, affiliateStats } from '@/db/schema'
-import { seedFirstAdmin } from '@/db/seedAdmin'
 import { eq, inArray, desc, sql, and, gte, lte } from 'drizzle-orm'
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
-import { migrate as migratePgOrig } from 'drizzle-orm/node-postgres/migrator'
-import { migrate as migrateSqliteOrig } from 'drizzle-orm/better-sqlite3/migrator'
+import { createDb } from '../db'
+
+const { db } = createDb();
+await maybeMigrate(db);
 
 const app = new Hono()
 
@@ -25,32 +25,15 @@ app.onError((err, c) => {
   return c.json({ type: 'about:blank', title: 'Internal Server Error', status: 500, code: 'internal_error' }, 500)
 })
 
-const DB_URL = process.env.DB || ''
-
-const SKIP =
-  process.env.SKIP_RUNTIME_MIGRATIONS === '1' ||
-  process.env.NODE_ENV === 'production'
-
-export async function safeMigrate() {
-  if (SKIP) {
-    console.log('[db] skip runtime migrations by env')
+async function maybeMigrate(db: any) {
+  if (process.env.MIGRATE_ON_BOOT !== '1') {
+    console.log('[db] MIGRATE_ON_BOOT!=1 -> skip runtime migrations')
     return
   }
-  try {
-    if (DB_URL.startsWith('postgres')) {
-      await migratePgOrig(db, { migrationsFolder: './drizzle' })
-    } else {
-      await migrateSqliteOrig(db, { migrationsFolder: './drizzle' })
-    }
-  } catch (e: any) {
-    const msg = String(e?.message || e)
-    if (e?.code === '42P07' || /already exists/i.test(msg)) {
-      console.log('[db] schema exists -> continue')
-      return
-    }
-    throw e
-  }
-  await seedFirstAdmin()
+  const { migrate } = await import('drizzle-orm/node-postgres/migrator')
+  await migrate(db, { migrationsFolder: './drizzle' })
+  const { seedFirstAdmin } = await import('../db/seedAdmin')
+  await seedFirstAdmin(db)
 }
 
 // ---------- utils/env ----------
