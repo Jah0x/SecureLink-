@@ -47,16 +47,12 @@ async function mountWorker() {
   }
 }
 
-// Статика фронта
-const clientDir = path.join(__dirname, '..', 'client')
-app.use(express.static(clientDir))
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(clientDir, 'index.html'))
-})
-
 // Запуск после монтирования worker-а
 const port = Number(process.env.PORT || 5173)
 ;(async () => {
-  await mountWorker()
+  await mountWorker()                                   // 1) сначала API
+  const clientDir = path.join(__dirname, '..', 'client')// 2) потом статика
+  app.use(express.static(clientDir))
+  app.get('*', (_req, res) => res.sendFile(path.join(clientDir, 'index.html')))
   app.listen(port, () => console.log(`listening on :${port}`))
 })()
