@@ -1,6 +1,6 @@
 node_modules
-dist/client
+dist
 .git
-.gitignore
-Dockerfile
-README.md
+.env
+Dockerfile*
+docker-compose*.yml

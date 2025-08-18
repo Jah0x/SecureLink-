@@ -1,9 +1,7 @@
-name: Build & Push
-
+name: Build & Push Docker
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: {}
 
 jobs:
   docker:
@@ -19,9 +17,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build & Push
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}/securelink:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/securelink:latest
