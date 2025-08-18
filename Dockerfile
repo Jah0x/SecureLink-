@@ -14,8 +14,10 @@ FROM node:20-slim
 WORKDIR /app
 
 ENV NODE_ENV=production
-# создаём non-root пользователя
-RUN useradd -ms /bin/bash appuser
+# создаём non-root пользователя и выдаём права на /app
+RUN useradd -ms /bin/bash appuser \
+ && mkdir -p /app/data \
+ && chown -R appuser:appuser /app
 USER appuser
 
 COPY --chown=appuser:appuser --from=builder /app/node_modules /app/node_modules

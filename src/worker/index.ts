@@ -438,9 +438,14 @@ if (AUTH_MODE === 'proxy') {
         .from(affiliateClicks)
         .where(eq(affiliateClicks.affiliateId, aff.id))
       const clicks = clicksRes[0]?.cnt || 0
+      const origin =
+        process.env.PUBLIC_APP_ORIGIN ||
+        (new URL(c.req.url)).origin ||
+        'https://dashboard.securesoft.dev'
+
       return c.json({
         code: aff.code,
-        share_url: `https://dashboard.zerologsvpn.com/r/${aff.code}`,
+        share_url: `${origin}/r/${aff.code}`,
         stats: { clicks, signups: 0, earnings_cents: 0 },
       })
     })
