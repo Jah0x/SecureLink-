@@ -9,7 +9,8 @@ spec:
       restartPolicy: Never
       containers:
       - name: migrate
-        image: ghcr.io/your-org/securelink:{{TAG}}
+        image: ghcr.io/${OWNER}/securelink:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: DB
           valueFrom:

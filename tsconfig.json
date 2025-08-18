@@ -1,26 +1,14 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "Bundler",
+    "module": "CommonJS",
     "outDir": "dist",
     "rootDir": "src",
-    "skipLibCheck": true,
-    "strict": true,
+    "moduleResolution": "Node",
     "esModuleInterop": true,
-    "types": ["node"],
-    "jsx": "react-jsx",
-    "lib": ["ES2022", "DOM"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "skipLibCheck": true,
+    "strict": true
   },
-  "include": [
-    "src/server/**/*",
-    "src/worker/**/*",
-    "src/db.ts",
-    "src/db/**/*",
-    "src/shared/**/*"
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

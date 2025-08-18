@@ -17,14 +17,13 @@ spec:
     spec:
       containers:
       - name: app
-        image: ghcr.io/your-org/securelink:{{TAG}}
+        image: ghcr.io/${OWNER}/securelink:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5173
         env:
-        - name: PORT
-          value: "5173"
-        - name: MIGRATE_ON_BOOT
-          value: "0"
+        - name: NODE_ENV
+          value: "production"
         - name: MARZBAN_API_URL
           value: "https://marzban.securesoft.dev"
         - name: MARZBAN_API_KEY
