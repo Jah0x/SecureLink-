@@ -12,7 +12,9 @@ import jwt from 'jsonwebtoken'
 import { createDb } from '../db'
 
 const { db } = createDb();
-await maybeMigrate(db);
+void (async () => {
+  await maybeMigrate(db);
+})();
 
 const app = new Hono()
 
