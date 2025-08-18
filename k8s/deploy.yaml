@@ -30,6 +30,8 @@ spec:
           value: "REPLACE_ME"
         - name: NEXT_PUBLIC_API_BASE_URL
           value: "https://dashboard.securesoft.dev"
+        - name: PUBLIC_APP_ORIGIN
+          value: "https://dashboard.securesoft.dev"
         - name: SESSION_COOKIE_DOMAIN
           value: ".securesoft.dev"
         - name: SESSION_COOKIE_SECURE

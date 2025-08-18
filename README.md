@@ -44,6 +44,7 @@ npm run build && npm run smoke:head
 - `ADMIN_EMAILS` – список e-mail администраторов через запятую
 - `FIRST_USER_ADMIN` – если `true`, первый зарегистрированный пользователь становится администратором
 - `NEXT_PUBLIC_API_BASE_URL` – базовый URL API (обычно `https://dashboard.zerologsvpn.com`)
+- `PUBLIC_APP_ORIGIN` – базовый origin приложения для генерации публичных ссылок
 - `DB` – строка подключения к базе данных (`postgresql://` или `sqlite:///`)
 - `FIRST_ADMIN_EMAIL` и `FIRST_ADMIN_PASSWORD` – учётные данные первого администратора; запись создаётся автоматически, если таблица `users` пустая
 - `SKIP_RUNTIME_MIGRATIONS` – пропустить миграции при старте (обычно `1` в проде)

@@ -10,31 +10,47 @@ app.get('/healthz', (_req, res) => res.status(200).send('ok'))
 // нативный dynamic import, чтобы tsc не превратил в require()
 const dynamicImport = new Function('p', 'return import(p)') as (p: string) => Promise<any>
 
+// helper: собираем Headers из express-headers
+function toHeaders(h: any) {
+  const out = new Headers()
+  for (const [k, v] of Object.entries(h || {})) {
+    if (v == null) continue
+    out.set(k, Array.isArray(v) ? v.join(',') : String(v))
+  }
+  return out
+}
+
+async function bufferBody(req: any): Promise<Uint8Array | string | undefined> {
+  const m = req.method
+  if (m === 'GET' || m === 'HEAD') return undefined
+
+  if (req.is?.('application/json')) {
+    return JSON.stringify(req.body ?? {})
+  }
+
+  const chunks: Buffer[] = []
+  await new Promise<void>((resolve, reject) => {
+    req.on('data', (c: any) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)))
+    req.on('end', () => resolve())
+    req.on('error', reject)
+  })
+  return Buffer.concat(chunks)
+}
+
 /** fallback-адаптер: подключает Hono-приложение к Express без зависимостей от hono/adapter */
 function honoAsExpress(honoApp: { fetch: (req: Request) => Promise<Response> }) {
-  return async (req: express.Request, res: express.Response) => {
+  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     try {
       const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`
+      const headers = toHeaders(req.headers)
+      const body = await bufferBody(req)
 
-      // перенесём заголовки
-      const headers = new Headers()
-      for (const [k, v] of Object.entries(req.headers)) {
-        if (Array.isArray(v)) headers.set(k, v.join(','))
-        else if (v !== undefined) headers.set(k, String(v))
-      }
-
-      // тело: для JSON восстановим строку из распарсенного body
-      const method = req.method
-      const bodyAllowed = method !== 'GET' && method !== 'HEAD'
-      let body: any = undefined
-      const ct = (req.headers['content-type'] || '') as string
-      if (bodyAllowed) {
-        if (ct.includes('application/json')) body = JSON.stringify(req.body ?? {})
-        else body = (req as any) // отдадим поток, если вдруг нужен raw
-      }
-
-      const request = new Request(url, { method, headers, body })
-      const resp = await honoApp.fetch(request)
+      const request = new Request(url, {
+        method: req.method,
+        headers,
+        body,
+      })
+      const resp = await honoApp.fetch(request as any)
 
       // заголовки/статус/тело обратно в Express
       res.status(resp.status)
@@ -44,7 +60,7 @@ function honoAsExpress(honoApp: { fetch: (req: Request) => Promise<Response> }) 
       else res.end()
     } catch (e) {
       console.error('[server] honoAsExpress error:', e)
-      res.status(500).end()
+      next(e)
     }
   }
 }
