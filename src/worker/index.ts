@@ -5,16 +5,14 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
-import { users, plans, planFeatures, affiliates, affiliateClicks, affiliateLinks, affiliateStats } from '@/db/schema'
+import { users, plans, planFeatures, affiliates, affiliateClicks, affiliateLinks, affiliateStats } from '../db/schema'
 import { eq, inArray, desc, sql, and, gte, lte } from 'drizzle-orm'
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
 import { createDb } from '../db'
 
-const { db } = createDb();
-void (async () => {
-  await maybeMigrate(db);
-})();
+const { db } = createDb()
+void maybeMigrate(db)
 
 const app = new Hono()
 
@@ -27,15 +25,17 @@ app.onError((err, c) => {
   return c.json({ type: 'about:blank', title: 'Internal Server Error', status: 500, code: 'internal_error' }, 500)
 })
 
-async function maybeMigrate(db: any) {
+function maybeMigrate(db: any) {
   if (process.env.MIGRATE_ON_BOOT !== '1') {
     console.log('[db] MIGRATE_ON_BOOT!=1 -> skip runtime migrations')
-    return
+    return Promise.resolve()
   }
-  const { migrate } = await import('drizzle-orm/node-postgres/migrator')
-  await migrate(db, { migrationsFolder: './drizzle' })
-  const { seedFirstAdmin } = await import('../db/seedAdmin')
-  await seedFirstAdmin(db)
+  const { migrate } = require('drizzle-orm/node-postgres/migrator')
+  return migrate(db, { migrationsFolder: './drizzle' })
+    .then(() => {
+      const { seedFirstAdmin } = require('../db/seedAdmin')
+      return seedFirstAdmin(db)
+    })
 }
 
 // ---------- utils/env ----------
@@ -64,25 +64,27 @@ function authUrl(path: string) {
 }
 
 if (AUTH_MODE === 'internal') {
-  fsSync.mkdirSync('/app/data', { recursive: true })
-  if (ADMIN_EMAILS.length) {
-    await db
-      .update(users)
-      .set({ role: 'admin' })
-      .where(inArray(users.email, ADMIN_EMAILS))
-  }
-  if (FIRST_USER_ADMIN) {
-    const regular = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.role, 'user'))
-    if (regular.length === 1) {
+  void (async () => {
+    fsSync.mkdirSync('/app/data', { recursive: true })
+    if (ADMIN_EMAILS.length) {
       await db
         .update(users)
         .set({ role: 'admin' })
-        .where(eq(users.id, regular[0].id))
+        .where(inArray(users.email, ADMIN_EMAILS))
     }
-  }
+    if (FIRST_USER_ADMIN) {
+      const regular = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.role, 'user'))
+      if (regular.length === 1) {
+        await db
+          .update(users)
+          .set({ role: 'admin' })
+          .where(eq(users.id, regular[0].id))
+      }
+    }
+  })()
 }
 
 function setSessionCookie(c: any, token: string, maxAge = SESSION_COOKIE_MAXAGE) {

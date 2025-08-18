@@ -2,6 +2,7 @@
   "name": "securelink-app",
   "private": true,
   "version": "0.0.0",
+  "type": "commonjs",
   "dependencies": {
     "@hono/node-server": "^1.19.0",
     "@hono/zod-validator": "^0.5.0",
@@ -54,7 +55,7 @@
     "dev:server": "tsx watch src/server/index.ts",
     "dev:vite": "vite",
     "check:aliases": "node -e \"const fs=require('fs'); const t=fs.readFileSync('dist/worker/index.js','utf8'); if(/@\\//.test(t)){console.error('alias @/ found in dist'); process.exit(1)} else console.log('aliases OK')\"",
-    "check:worker": "node -e \"const p=require('path'); const di=new Function('x','return import(x)'); const u=new URL('file://'+p.join(process.cwd(),'dist','worker','index.js')).href; di(u).then(()=>console.log('worker OK')).catch(e=>{console.error(e.stack||e);process.exit(1)})\""
+    "check:worker": "DB=postgres://user:pass@localhost:5432/db node -e \"const p=require('path'); const di=new Function('x','return import(x)'); const u=new URL('file://'+p.join(process.cwd(),'dist','worker','index.js')).href; di(u).then(()=>console.log('worker OK')).catch(e=>{console.error(e.stack||e);process.exit(1)})\""
   },
   "engines": {
     "node": ">=20"
