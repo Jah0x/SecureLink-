@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "dependencies": {
+    "@hono/node-server": "^1.19.0",
     "@hono/zod-validator": "^0.5.0",
     "argon2": "^0.44.0",
     "drizzle-orm": "^0.44.4",
@@ -35,7 +36,7 @@
     "globals": "15.15.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
-    "tsc-alias": "^1.8.8",
+    "tscpaths": "^0.0.9",
     "tsx": "^4",
     "typescript": "^5.5.0",
     "typescript-eslint": "8.31.0",
@@ -43,7 +44,7 @@
     "wrangler": "^4.25.0"
   },
   "scripts": {
-    "build": "tsc -b && tsc-alias && vite build",
+    "build": "tsc -b && tscpaths -p tsconfig.json -s ./src -o ./dist && vite build",
     "start": "node dist/server/index.js",
     "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:vite\"",
     "migrate:push": "drizzle-kit push --config ./drizzle.config.ts",
@@ -53,6 +54,9 @@
     "dev:server": "tsx watch src/server/index.ts",
     "dev:vite": "vite",
     "check:aliases": "node -e \"const fs=require('fs'); const t=fs.readFileSync('dist/worker/index.js','utf8'); if(/@\\//.test(t)){console.error('alias @/ found in dist'); process.exit(1)} else console.log('aliases OK')\"",
-    "check:worker": "node -e \"const di=new Function('p','return import(p)'); const p=require('path'); const u=new URL('file://'+p.join(process.cwd(),'dist','worker','index.js')).href; di(u).then(()=>console.log('worker OK')).catch(e=>{console.error(e);process.exit(1)})\""
+    "check:worker": "node -e \"const p=require('path'); const di=new Function('x','return import(x)'); const u=new URL('file://'+p.join(process.cwd(),'dist','worker','index.js')).href; di(u).then(()=>console.log('worker OK')).catch(e=>{console.error(e.stack||e);process.exit(1)})\""
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
