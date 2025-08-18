@@ -4,11 +4,9 @@ import { pathToFileURL } from 'url'
 
 const app = express()
 app.use(express.json())
-
-// health
 app.get('/healthz', (_req, res) => res.status(200).send('ok'))
 
-// ГАРАНТИРОВАННО нативный dynamic import, чтобы TSC НЕ превратил import() в require()
+// Реальный dynamic import, чтобы TSC не превратил import() в require()
 const dynamicImport = new Function('p', 'return import(p)') as (p: string) => Promise<any>
 
 async function mountWorker() {
@@ -16,11 +14,10 @@ async function mountWorker() {
     const workerPath = path.join(__dirname, '..', 'worker', 'index.js')
     const mod: any = await dynamicImport(pathToFileURL(workerPath).href)
 
-    const honoApp = mod.app || mod.default || null
-
-    if (honoApp && typeof honoApp.fetch === 'function') {
+    const appExport = mod.app || mod.default
+    if (appExport && typeof appExport.fetch === 'function') {
       const { handle } = await dynamicImport('hono/adapter')
-      app.use(handle(honoApp))
+      app.use(handle(appExport))
       console.log('[server] mounted Hono app from worker on /')
       return
     }
@@ -40,15 +37,13 @@ async function mountWorker() {
 
 const port = Number(process.env.PORT || 5173)
 ;(async () => {
-  // 1) СНАЧАЛА подключаем API (worker)
+  // 1) сначала API
   await mountWorker()
 
-  // 2) ПОТОМ — статику и SPA fallback
+  // 2) потом статика и SPA fallback
   const clientDir = path.join(__dirname, '..', 'client')
   app.use(express.static(clientDir))
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(clientDir, 'index.html'))
-  })
+  app.get('*', (_req, res) => res.sendFile(path.join(clientDir, 'index.html')))
 
   app.listen(port, () => console.log(`listening on :${port}`))
 })()
