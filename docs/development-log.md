@@ -54,3 +54,4 @@
 - Реализован полноценный Docker-образ без bootstrap: Node-сервер на http с /healthz, ленивые миграции Drizzle через флаг `MIGRATE_ON_BOOT`, отдельный Job для миграций в k8s, CI публикует образ в ghcr.
 - Исправлена проксировка POST/PUT в Node 20: для стримовых тел добавлен `duplex: 'half'` и опциональная буферизация через `USE_BUFFERED_BODY`.
 - Обновлена сборка: добавлены Dockerfile/dev и docker-compose для разработки, CI публикует образ в GHCR, k8s-манифесты очищены от bootstrap.
+- Node-сервер динамически монтирует Hono-worker через `hono/adapter`, устраняя 404 на `/api/*` и сохраняя раздачу статики и `GET /healthz`.

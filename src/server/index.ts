@@ -1,20 +1,62 @@
-import express, { Request, Response } from 'express';
-import path from 'path';
+import express from 'express'
+import path from 'path'
+import { pathToFileURL } from 'url'
 
-const app = express();
-const port = process.env.PORT || 5173;
+const app = express()
+app.use(express.json())
 
-const clientPath = path.join(__dirname, '../client');
-app.use(express.static(clientPath));
+// health
+app.get('/healthz', (_req, res) => res.status(200).send('ok'))
 
-app.get('/healthz', (_req: Request, res: Response) => {
-  res.sendStatus(200);
-});
+/**
+ * Монтируем Hono-worker из dist/worker/index.js
+ * Worker собран как ESM (с TLA), поэтому используем dynamic import() + hono/adapter.
+ * Поддерживаем варианты экспорта:
+ *  - app (Hono instance с .fetch)
+ *  - default (Hono instance)
+ *  - fetch (standalone handler)
+ */
+async function mountWorker() {
+  try {
+    const workerPath = path.join(__dirname, '..', 'worker', 'index.js') // dist/server -> dist/worker
+    const workerUrl = pathToFileURL(workerPath).href
+    const mod: any = await import(workerUrl)
 
-app.get('*', (_req: Request, res: Response) => {
-  res.sendFile(path.join(clientPath, 'index.html'));
-});
+    const maybeApp = mod.app || mod.default || null
+    if (maybeApp && typeof maybeApp.fetch === 'function') {
+      const { handle } = (await import('hono/adapter') as any)
+      if (typeof handle === 'function') {
+        app.use(handle(maybeApp))
+        console.log('[server] mounted Hono app from worker on /')
+        return
+      }
+    }
 
-app.listen(port, () => {
-  console.log(`listening on :${port}`);
-});
+    if (typeof mod.fetch === 'function') {
+      const { handle } = (await import('hono/adapter') as any)
+      if (typeof handle === 'function') {
+        app.use(handle({ fetch: mod.fetch.bind(mod) } as any))
+        console.log('[server] mounted fetch() from worker on /')
+        return
+      }
+    }
+
+    console.warn('[server] worker found but no app/fetch exports')
+  } catch (e: any) {
+    console.warn('[server] worker import failed:', e?.message || e)
+  }
+}
+
+// Статика фронта
+const clientDir = path.join(__dirname, '..', 'client')
+app.use(express.static(clientDir))
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(clientDir, 'index.html'))
+})
+
+// Запуск после монтирования worker-а
+const port = Number(process.env.PORT || 5173)
+;(async () => {
+  await mountWorker()
+  app.listen(port, () => console.log(`listening on :${port}`))
+})()
