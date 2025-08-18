@@ -9,10 +9,52 @@ import { users, plans, planFeatures, affiliates, affiliateClicks, affiliateLinks
 import { eq, inArray, desc, sql, and, gte, lte } from 'drizzle-orm'
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
-import { createDb } from '../db'
+import { getDb } from '../db'
 
-const { db } = createDb()
-void maybeMigrate(db)
+let migrated = false
+let adminsSynced = false
+
+async function runMigrations(db: any) {
+  if (migrated || process.env.MIGRATE_ON_BOOT !== '1') return
+  const { migrate } = await import('drizzle-orm/node-postgres/migrator')
+  await migrate(db, { migrationsFolder: './drizzle' })
+  const { seedFirstAdmin } = await import('../db/seedAdmin')
+  await seedFirstAdmin(db)
+  migrated = true
+}
+
+async function syncAdmins(db: any) {
+  if (adminsSynced || AUTH_MODE !== 'internal') return
+  adminsSynced = true
+  fsSync.mkdirSync('/app/data', { recursive: true })
+  if (ADMIN_EMAILS.length) {
+    await db
+      .update(users)
+      .set({ role: 'admin' })
+      .where(inArray(users.email, ADMIN_EMAILS))
+  }
+  if (FIRST_USER_ADMIN) {
+    const regular = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.role, 'user'))
+    if (regular.length === 1) {
+      await db
+        .update(users)
+        .set({ role: 'admin' })
+        .where(eq(users.id, regular[0].id))
+    }
+  }
+}
+
+async function requireDb(c: any, next: any) {
+  const db = getDb()
+  if (!db) return c.json({ error: 'DB not configured' }, 503)
+  await runMigrations(db)
+  await syncAdmins(db)
+  c.set('db', db)
+  await next()
+}
 
 const app = new Hono()
 
@@ -24,19 +66,6 @@ app.onError((err, c) => {
   })
   return c.json({ type: 'about:blank', title: 'Internal Server Error', status: 500, code: 'internal_error' }, 500)
 })
-
-function maybeMigrate(db: any) {
-  if (process.env.MIGRATE_ON_BOOT !== '1') {
-    console.log('[db] MIGRATE_ON_BOOT!=1 -> skip runtime migrations')
-    return Promise.resolve()
-  }
-  const { migrate } = require('drizzle-orm/node-postgres/migrator')
-  return migrate(db, { migrationsFolder: './drizzle' })
-    .then(() => {
-      const { seedFirstAdmin } = require('../db/seedAdmin')
-      return seedFirstAdmin(db)
-    })
-}
 
 // ---------- utils/env ----------
 const AUTH_BASE = process.env.AUTH_BASE_URL
@@ -61,30 +90,6 @@ const FEATURE_REFERRALS = String(process.env.FEATURE_REFERRALS || 'true') === 't
 function authUrl(path: string) {
   if (!AUTH_BASE) throw new Error('AUTH_BASE_URL is not set')
   return new URL(path, AUTH_BASE)
-}
-
-if (AUTH_MODE === 'internal') {
-  void (async () => {
-    fsSync.mkdirSync('/app/data', { recursive: true })
-    if (ADMIN_EMAILS.length) {
-      await db
-        .update(users)
-        .set({ role: 'admin' })
-        .where(inArray(users.email, ADMIN_EMAILS))
-    }
-    if (FIRST_USER_ADMIN) {
-      const regular = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.role, 'user'))
-      if (regular.length === 1) {
-        await db
-          .update(users)
-          .set({ role: 'admin' })
-          .where(eq(users.id, regular[0].id))
-      }
-    }
-  })()
 }
 
 function setSessionCookie(c: any, token: string, maxAge = SESSION_COOKIE_MAXAGE) {
@@ -138,6 +143,10 @@ app.post('/api/auth/register', async (c) => {
       if (token) setSessionCookie(c, token)
       return new Response(txt, { status: r.status, headers: { 'content-type': r.headers.get('content-type') ?? 'application/json' } })
     }
+    const db = getDb()
+    if (!db) return c.json({ error: 'DB not configured' }, 503)
+    await runMigrations(db)
+    await syncAdmins(db)
     const { email, password } = payload || {}
     if (!email || !password) return c.json({ error: 'invalid_input' }, 400)
     const existing = await db
@@ -178,6 +187,10 @@ app.post('/api/auth/login', async (c) => {
       if (token) setSessionCookie(c, token)
       return new Response(txt, { status: r.status, headers: { 'content-type': r.headers.get('content-type') ?? 'application/json' } })
     }
+    const db = getDb()
+    if (!db) return c.json({ error: 'DB not configured' }, 503)
+    await runMigrations(db)
+    await syncAdmins(db)
     const { email, password } = payload || {}
     if (!email || !password) return c.json({ error: 'invalid_input' }, 400)
     const rows = await db
@@ -231,7 +244,7 @@ if (AUTH_MODE === 'proxy') {
     }
   })
 } else {
-  async function genAffCode() {
+  async function genAffCode(db: any) {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
     while (true) {
       const len = 6 + Math.floor(Math.random() * 3)
@@ -246,7 +259,8 @@ if (AUTH_MODE === 'proxy') {
     }
   }
 
-  app.get('/api/users/me', requireAuth, async (c) => {
+  app.get('/api/users/me', requireAuth, requireDb, async (c) => {
+    const db = c.get('db')
     const user: any = c.get('user')
     const rows = await db
       .select({ id: users.id, email: users.email, role: users.role, createdAt: users.createdAt })
@@ -258,9 +272,10 @@ if (AUTH_MODE === 'proxy') {
     return c.json(row)
   })
 
-  app.get('/api/admin/ping', requireAuth, requireAdmin, (c) => c.json({ ok: true }))
+  app.get('/api/admin/ping', requireAuth, requireAdmin, requireDb, (c) => c.json({ ok: true }))
 
-  app.get('/api/admin/users', requireAuth, requireAdmin, async (c) => {
+  app.get('/api/admin/users', requireAuth, requireAdmin, requireDb, async (c) => {
+    const db = c.get('db')
     const rows = await db
       .select({ id: users.id, email: users.email, role: users.role, createdAt: users.createdAt })
       .from(users)
@@ -268,7 +283,8 @@ if (AUTH_MODE === 'proxy') {
     return c.json(rows)
   })
 
-  app.post('/api/admin/users', requireAuth, requireAdmin, async (c) => {
+  app.post('/api/admin/users', requireAuth, requireAdmin, requireDb, async (c) => {
+    const db = c.get('db')
     const body = await c.req.json()
     const { email, password, role = 'user' } = body || {}
     if (!email || !password) return c.json({ error: 'invalid_input' }, 400)
@@ -286,7 +302,8 @@ if (AUTH_MODE === 'proxy') {
     return c.json(inserted[0], 201)
   })
 
-  app.get('/api/plans', async (c) => {
+  app.get('/api/plans', requireDb, async (c) => {
+    const db = c.get('db')
     const rows = await db
       .select()
       .from(plans)
@@ -295,7 +312,8 @@ if (AUTH_MODE === 'proxy') {
     return c.json(rows)
   })
 
-  app.get('/api/admin/plans', requireAuth, requireAdmin, async (c) => {
+  app.get('/api/admin/plans', requireAuth, requireAdmin, requireDb, async (c) => {
+    const db = c.get('db')
     const offset = Number(c.req.query('offset') || '0')
     const limit = Number(c.req.query('limit') || '50')
     const q = (c.req.query('active') || 'all').toLowerCase()
@@ -308,7 +326,8 @@ if (AUTH_MODE === 'proxy') {
     return c.json(rows)
   })
 
-  app.get('/api/admin/plans/:id', requireAuth, requireAdmin, async (c) => {
+  app.get('/api/admin/plans/:id', requireAuth, requireAdmin, requireDb, async (c) => {
+    const db = c.get('db')
     const id = Number(c.req.param('id'))
     const rows = await db.select().from(plans).where(eq(plans.id, id)).limit(1)
     const plan = rows[0]
@@ -316,7 +335,8 @@ if (AUTH_MODE === 'proxy') {
     return c.json(plan)
   })
 
-  app.post('/api/admin/plans', requireAuth, requireAdmin, async (c) => {
+  app.post('/api/admin/plans', requireAuth, requireAdmin, requireDb, async (c) => {
+    const db = c.get('db')
     const body = await c.req.json()
     const { name, price_cents, active = true } = body || {}
     if (!name || name.length < 1 || name.length > 100) {
@@ -332,7 +352,8 @@ if (AUTH_MODE === 'proxy') {
     return c.json(inserted[0], 201)
   })
 
-  app.put('/api/admin/plans/:id', requireAuth, requireAdmin, async (c) => {
+  app.put('/api/admin/plans/:id', requireAuth, requireAdmin, requireDb, async (c) => {
+    const db = c.get('db')
     const id = Number(c.req.param('id'))
     const body = await c.req.json()
     const updates: any = {}
@@ -360,25 +381,29 @@ if (AUTH_MODE === 'proxy') {
     return c.json(plan)
   })
 
-  app.delete('/api/admin/plans/:id', requireAuth, requireAdmin, async (c) => {
+  app.delete('/api/admin/plans/:id', requireAuth, requireAdmin, requireDb, async (c) => {
+    const db = c.get('db')
     const id = Number(c.req.param('id'))
     await db.update(plans).set({ active: false }).where(eq(plans.id, id))
     return c.json({ ok: true })
   })
 
-  app.post('/api/admin/plans/:id/activate', requireAuth, requireAdmin, async (c) => {
+  app.post('/api/admin/plans/:id/activate', requireAuth, requireAdmin, requireDb, async (c) => {
+    const db = c.get('db')
     const id = Number(c.req.param('id'))
     await db.update(plans).set({ active: true }).where(eq(plans.id, id))
     return c.json({ ok: true })
   })
 
   if (FEATURE_REFERRALS) {
-    app.get('/api/admin/affiliates', requireAuth, requireAdmin, async (c) => {
+    app.get('/api/admin/affiliates', requireAuth, requireAdmin, requireDb, async (c) => {
+      const db = c.get('db')
       const rows = await db.select().from(affiliates).orderBy(desc(affiliates.id))
       return c.json(rows)
     })
 
-    app.get('/r/:code', async (c) => {
+    app.get('/r/:code', requireDb, async (c) => {
+      const db = c.get('db')
       const code = c.req.param('code')
       const rows = await db.select().from(affiliates).where(eq(affiliates.code, code)).limit(1)
       const row = rows[0]
@@ -395,12 +420,13 @@ if (AUTH_MODE === 'proxy') {
       return c.redirect('/pricing')
     })
 
-    app.get('/api/aff/me', requireAuth, async (c) => {
+    app.get('/api/aff/me', requireAuth, requireDb, async (c) => {
+      const db = c.get('db')
       const user: any = c.get('user')
       let rows = await db.select().from(affiliates).where(eq(affiliates.ownerUserId, user.sub)).limit(1)
       let aff = rows[0]
       if (!aff) {
-        const code = await genAffCode()
+        const code = await genAffCode(db)
         const inserted = await db
           .insert(affiliates)
           .values({ ownerUserId: user.sub, code })
@@ -419,7 +445,8 @@ if (AUTH_MODE === 'proxy') {
       })
     })
 
-    app.get('/api/aff/stats', requireAuth, async (c) => {
+    app.get('/api/aff/stats', requireAuth, requireDb, async (c) => {
+      const db = c.get('db')
       const user: any = c.get('user')
       const fromStr = c.req.query('from')
       const toStr = c.req.query('to')
@@ -471,4 +498,5 @@ app.get('/', async (c) => c.html(await fs.readFile(INDEX_PATH, 'utf8')))
 // fallback — последним
 app.get('*', serveStatic({ path: INDEX_PATH }))
 
+export { app }
 export default app
