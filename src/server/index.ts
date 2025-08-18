@@ -8,6 +8,9 @@ app.use(express.json())
 // health
 app.get('/healthz', (_req, res) => res.status(200).send('ok'))
 
+// ВАЖНО: нативный dynamic import, чтобы tsc не сделал require()
+const dynamicImport = new Function('p', 'return import(p)') as (p: string) => Promise<any>
+
 /**
  * Монтируем Hono-worker из dist/worker/index.js
  * Worker собран как ESM (с TLA), поэтому используем dynamic import() + hono/adapter.
@@ -20,11 +23,11 @@ async function mountWorker() {
   try {
     const workerPath = path.join(__dirname, '..', 'worker', 'index.js') // dist/server -> dist/worker
     const workerUrl = pathToFileURL(workerPath).href
-    const mod: any = await import(workerUrl)
+    const mod: any = await dynamicImport(workerUrl)
 
     const maybeApp = mod.app || mod.default || null
     if (maybeApp && typeof maybeApp.fetch === 'function') {
-      const { handle } = (await import('hono/adapter') as any)
+      const { handle } = (await dynamicImport('hono/adapter') as any)
       if (typeof handle === 'function') {
         app.use(handle(maybeApp))
         console.log('[server] mounted Hono app from worker on /')
@@ -33,7 +36,7 @@ async function mountWorker() {
     }
 
     if (typeof mod.fetch === 'function') {
-      const { handle } = (await import('hono/adapter') as any)
+      const { handle } = (await dynamicImport('hono/adapter') as any)
       if (typeof handle === 'function') {
         app.use(handle({ fetch: mod.fetch.bind(mod) } as any))
         console.log('[server] mounted fetch() from worker on /')
