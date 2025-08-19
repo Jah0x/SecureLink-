@@ -36,7 +36,7 @@ npm run build && npm run smoke:head
 - `AUTH_PATH_ME` – путь профиля пользователя (по умолчанию `/users/me`)
 - `AUTH_PATH_LOGOUT` – путь выхода (по умолчанию `/users/logout`)
 - `SESSION_COOKIE_NAME` – имя HttpOnly‑куки сессии
-- `SESSION_COOKIE_DOMAIN` – домен для установки куки (обычно `.zerologsvpn.com`)
+- `SESSION_COOKIE_DOMAIN` – домен для установки куки (если не задан, куки ставится на текущий хост)
 - `SESSION_COOKIE_SECURE` – флаг `Secure`
 - `SESSION_COOKIE_SAMESITE` – политика `SameSite`
 - `SESSION_COOKIE_MAXAGE` – время жизни куки в секундах
@@ -93,7 +93,7 @@ psql "$DB" < sql/migrations/2025-08-fix-plans.sql
 ```env
 DB=postgresql://securelink:password@postgres:5432/securelink?sslmode=disable
 AUTH_MODE=internal
-SESSION_COOKIE_DOMAIN=.zerologsvpn.com
+#SESSION_COOKIE_DOMAIN=.zerologsvpn.com # оставьте закомментированным для localhost
 SESSION_COOKIE_SECURE=true
 SESSION_COOKIE_SAMESITE=None
 FIRST_ADMIN_EMAIL=admin@example.com

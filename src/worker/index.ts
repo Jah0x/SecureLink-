@@ -87,7 +87,7 @@ const PATH_ME       = process.env.AUTH_PATH_ME       || '/users/me'
 const PATH_LOGOUT   = process.env.AUTH_PATH_LOGOUT   || '/users/logout'
 
 const SESSION_COOKIE_NAME   = process.env.SESSION_COOKIE_NAME || 'session_token'
-const SESSION_COOKIE_DOMAIN = process.env.SESSION_COOKIE_DOMAIN || '.zerologsvpn.com'
+const SESSION_COOKIE_DOMAIN = process.env.SESSION_COOKIE_DOMAIN
 const SESSION_COOKIE_SECURE = String(process.env.SESSION_COOKIE_SECURE || 'true') === 'true'
 const SESSION_COOKIE_SAMESITE = (process.env.SESSION_COOKIE_SAMESITE || 'None') as 'Lax'|'Strict'|'None'
 const SESSION_COOKIE_MAXAGE = Number(process.env.SESSION_COOKIE_MAXAGE || 60*60*24*30)
@@ -102,13 +102,14 @@ function authUrl(path: string) {
   return new URL(path, AUTH_BASE)
 }
 
+const SESSION_COOKIE_OPTS = SESSION_COOKIE_DOMAIN ? { domain: SESSION_COOKIE_DOMAIN, path: '/' } : { path: '/' }
+
 function setSessionCookie(c: any, token: string, maxAge = SESSION_COOKIE_MAXAGE) {
   setCookie(c, SESSION_COOKIE_NAME, token, {
+    ...SESSION_COOKIE_OPTS,
     httpOnly: true,
     secure: SESSION_COOKIE_SECURE,
     sameSite: SESSION_COOKIE_SAMESITE,
-    domain: SESSION_COOKIE_DOMAIN,
-    path: '/',
     maxAge,
   })
 }
@@ -225,14 +226,14 @@ app.post('/api/auth/logout', async (c) => {
   try {
     if (AUTH_MODE === 'proxy') {
       const r = await fetch(authUrl(PATH_LOGOUT), { method: 'POST' })
-      deleteCookie(c, SESSION_COOKIE_NAME, { domain: SESSION_COOKIE_DOMAIN, path: '/' })
+      deleteCookie(c, SESSION_COOKIE_NAME, SESSION_COOKIE_OPTS)
       return new Response(await r.text(), { status: r.status, headers: { 'content-type': r.headers.get('content-type') ?? 'application/json' } })
     }
-    deleteCookie(c, SESSION_COOKIE_NAME, { domain: SESSION_COOKIE_DOMAIN, path: '/' })
+    deleteCookie(c, SESSION_COOKIE_NAME, SESSION_COOKIE_OPTS)
     return c.json({ ok: true })
   } catch (e:any) {
     console.error('logout error', e)
-    deleteCookie(c, SESSION_COOKIE_NAME, { domain: SESSION_COOKIE_DOMAIN, path: '/' })
+    deleteCookie(c, SESSION_COOKIE_NAME, SESSION_COOKIE_OPTS)
     return c.json({ ok: true })
   }
 })
