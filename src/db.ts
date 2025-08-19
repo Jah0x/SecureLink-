@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
-import pg from 'pg'
+import pg from './db/client'
 
 type DB = ReturnType<typeof drizzle>
 let _db: DB | null = null

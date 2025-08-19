@@ -5,6 +5,7 @@ import Dashboard from "@/react-app/pages/Dashboard";
 import Pricing from "@/react-app/pages/Pricing";
 import Earnings from "@/react-app/pages/Earnings";
 import Admin from "@/react-app/pages/Admin";
+import { ErrorBoundary } from "@/react-app/components/ErrorBoundary";
 import Register from "@/react-app/pages/Register";
 import Privacy from "@/pages/privacy";
 
@@ -20,7 +21,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/earnings" element={<Earnings />} />
-          <Route path="/admin" element={<Admin />} />
+          <Route path="/admin" element={<ErrorBoundary><Admin /></ErrorBoundary>} />
           <Route path="/privacy" element={<Privacy />} />
         </Routes>
       </Router>

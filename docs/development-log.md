@@ -63,3 +63,5 @@
 
 - Добавлен fallback-адаптер для монтирования Hono-приложения в Express, устойчивый к изменениям API `hono/adapter`.
 - Устранена ошибка `RequestInit: duplex option is required`: тела запросов в Express→Hono всегда буферизуются, Docker-образ создаёт каталог `/app/data` и выдаёт права на `/app`, а реферальные ссылки используют origin из окружения `PUBLIC_APP_ORIGIN`.
+
+- Переработана схема тарифов: БД хранит `price` (NUMERIC), `period_days`, `traffic_mb` и флаг `is_active`; добавлен маппер `mapPlanRow`, нормализованы типы pg и API возвращает `price` как number. Фронтенд и админка перешли на camelCase‑контракты, добавлен ErrorBoundary, CI создаёт тестовый план и проверяет `/api/pricing`.

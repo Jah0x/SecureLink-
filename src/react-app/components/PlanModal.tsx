@@ -4,22 +4,21 @@ import { X } from 'lucide-react';
 interface VpnPlan {
   id: number;
   name: string;
-  price_cents: number;
-  period_days: number;
-  traffic_limit_gb: number | null;
-  features: string[];
-  is_active: boolean;
-  created_at: string;
+  price: number;
+  periodDays: number;
+  trafficMb: number | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface VpnPlanForm {
   id?: number;
   name: string;
-  price_rub: number;
-  period_days: number;
-  traffic_limit_gb: number | null;
-  features: string;
-  is_active: boolean;
+  price: number;
+  periodDays: number;
+  trafficMb: number | null;
+  active: boolean;
 }
 
 interface PlanModalProps {
@@ -32,11 +31,10 @@ interface PlanModalProps {
 export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalProps) {
   const [formData, setFormData] = useState<VpnPlanForm>({
     name: '',
-    price_rub: 0,
-    period_days: 30,
-    traffic_limit_gb: null,
-    features: '',
-    is_active: true,
+    price: 0,
+    periodDays: 30,
+    trafficMb: null,
+    active: true,
   });
 
   useEffect(() => {
@@ -44,20 +42,18 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
       setFormData({
         id: plan.id,
         name: plan.name,
-        price_rub: plan.price_cents / 100,
-        period_days: plan.period_days,
-        traffic_limit_gb: plan.traffic_limit_gb,
-        features: plan.features.join(', '),
-        is_active: plan.is_active,
+        price: plan.price,
+        periodDays: plan.periodDays,
+        trafficMb: plan.trafficMb,
+        active: plan.active,
       })
     } else {
       setFormData({
         name: '',
-        price_rub: 0,
-        period_days: 30,
-        traffic_limit_gb: null,
-        features: '',
-        is_active: true,
+        price: 0,
+        periodDays: 30,
+        trafficMb: null,
+        active: true,
       })
     }
   }, [plan]);
@@ -68,15 +64,15 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
       alert('Название должно быть от 1 до 100 символов');
       return;
     }
-    if (formData.price_rub <= 0) {
+    if (formData.price <= 0) {
       alert('Цена должна быть больше 0');
       return;
     }
-    if (formData.period_days < 1) {
+    if (formData.periodDays < 1) {
       alert('Период должен быть не менее 1 дня');
       return;
     }
-    if (formData.traffic_limit_gb != null && formData.traffic_limit_gb < 0) {
+    if (formData.trafficMb != null && formData.trafficMb < 0) {
       alert('Лимит трафика должен быть 0 или больше');
       return;
     }
@@ -122,8 +118,8 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
               <input
                 type="number"
                 min="1"
-                value={formData.period_days}
-                onChange={(e) => setFormData({ ...formData, period_days: parseInt(e.target.value) })}
+                value={formData.periodDays}
+                onChange={(e) => setFormData({ ...formData, periodDays: parseInt(e.target.value) })}
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -136,44 +132,30 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
               <input
                 type="number"
                 min="0"
-                value={formData.price_rub}
-                onChange={(e) => setFormData({ ...formData, price_rub: parseInt(e.target.value) })}
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) })}
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Лимит трафика (ГБ)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.traffic_limit_gb ?? ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    traffic_limit_gb: e.target.value ? parseInt(e.target.value) : null,
-                  })
-                }
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Безлимит"
-              />
-            </div>
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Фичи (через запятую)
+              Лимит трафика (МБ)
             </label>
-            <textarea
-              value={formData.features}
-              onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+            <input
+              type="number"
+              min="0"
+              value={formData.trafficMb ?? ''}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  trafficMb: e.target.value ? parseInt(e.target.value) : null,
+                })
+              }
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={2}
+              placeholder="Безлимит"
             />
           </div>
 
@@ -181,8 +163,8 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
             <input
               type="checkbox"
               id="is_active"
-              checked={formData.is_active}
-              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              checked={formData.active}
+              onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
               className="w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500"
             />
             <label htmlFor="is_active" className="ml-2 text-sm text-slate-300">

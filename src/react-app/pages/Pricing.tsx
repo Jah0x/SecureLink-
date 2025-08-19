@@ -7,12 +7,12 @@ import { Check, Shield, Zap, Globe } from 'lucide-react';
 interface VpnPlan {
   id: number;
   name: string;
-  price_cents: number;
-  period_days: number;
-  traffic_limit_gb: number | null;
-  features: string[];
-  is_active: boolean;
-  created_at: string;
+  price: number;
+  periodDays: number;
+  trafficMb: number | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function Pricing() {
@@ -53,7 +53,7 @@ export default function Pricing() {
 
     const fetchPlans = async () => {
       try {
-        const response = await fetch('/api/plans');
+        const response = await fetch('/api/pricing');
         if (response.ok) {
           const data = await response.json();
           setPlans(data);
@@ -97,12 +97,11 @@ export default function Pricing() {
     }
   };
 
-  const formatPrice = (priceCents: number) => {
+  const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-      minimumFractionDigits: 0,
-    }).format(priceCents / 100);
+    }).format(price);
   };
 
   const getPopularBadge = (periodDays: number) => {
@@ -147,27 +146,22 @@ export default function Pricing() {
               key={plan.id}
               className="relative bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-slate-600 transition-all duration-300 group hover:shadow-2xl hover:shadow-blue-500/10"
             >
-              {getPopularBadge(plan.period_days)}
+              {getPopularBadge(plan.periodDays)}
 
               <div className="text-center mb-8">
                 <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
-                <div className="text-3xl font-bold text-white mb-1">{formatPrice(plan.price_cents)}</div>
-                <p className="text-slate-400 text-sm">{plan.period_days} дн.</p>
+                <div className="text-3xl font-bold text-white mb-1">{formatPrice(plan.price)}</div>
+                <p className="text-slate-400 text-sm">{plan.periodDays} дн.</p>
               </div>
 
               <div className="space-y-4 mb-8">
                 <div className="flex items-center space-x-3">
                   <Check className="w-5 h-5 text-green-400" />
                   <span className="text-slate-300">
-                    {plan.traffic_limit_gb ? `${plan.traffic_limit_gb} ГБ трафика` : 'Безлимитный трафик'}
-                  </span>
-                </div>
-                {plan.features.map((f) => (
-                  <div key={f} className="flex items-center space-x-3">
-                    <Shield className="w-5 h-5 text-blue-400" />
-                    <span className="text-slate-300">{f}</span>
-                  </div>
-                ))}
+                    {plan.trafficMb ? `${plan.trafficMb} МБ трафика` : 'Безлимитный трафик'}
+                </span>
+              </div>
+                {/* индивидуальные особенности плана не передаются */}
               </div>
 
               <button

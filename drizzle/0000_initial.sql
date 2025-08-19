@@ -7,10 +7,14 @@ CREATE TABLE users (
 );
 
 CREATE TABLE plans (
-  id SERIAL PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL,
-  price_cents INTEGER NOT NULL,
-  active BOOLEAN NOT NULL DEFAULT TRUE
+  price NUMERIC(12,2) NOT NULL,
+  period_days INTEGER NOT NULL,
+  traffic_mb INTEGER,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE plan_features (
