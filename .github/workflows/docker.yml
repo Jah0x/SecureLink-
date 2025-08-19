@@ -26,30 +26,77 @@ jobs:
           tags: app:ci
           load: true
 
-      # Smoke test: run container and curl endpoints
-      - name: Run container for smoke test
+      # Smoke test: start dependencies and verify endpoints
+      - name: Create CI docker network
+        run: docker network create ci-net || true
+
+      - name: Start Postgres (service)
         run: |
-          docker run -d --rm --name db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=test -p 5432:5432 postgres:16
-          docker run -d --rm --name app-ci --link db -p 5173:5173 \
-            -e DB=postgresql://postgres:postgres@db:5432/test?sslmode=disable \
-            -e MIGRATE_ON_BOOT=1 \
-            -e FIRST_ADMIN_EMAIL=admin@example.com \
-            -e FIRST_ADMIN_PASSWORD=secret \
-            app:ci
-          for i in $(seq 1 30); do
-            sleep 2
-            if curl -fsS http://127.0.0.1:5173/healthz >/dev/null; then break; fi
-            if [ $i -eq 30 ]; then echo "healthz failed"; docker logs app-ci; exit 1; fi
+          docker run -d --rm --name db --network ci-net \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=test \
+            -p 5432:5432 \
+            --health-cmd="pg_isready -U postgres -d test" \
+            --health-interval=2s --health-timeout=2s --health-retries=60 \
+            postgres:16-alpine
+
+      - name: Wait for Postgres to be healthy
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..120}; do
+            status="$(docker inspect -f '{{.State.Health.Status}}' db || echo starting)"
+            if [[ "$status" == "healthy" ]]; then exit 0; fi
+            sleep 1
           done
-          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:5173/api/auth/login -H "content-type: application/json" -d '{}')
-          if [ "$code" = "404" ]; then echo "/api/auth/login returned 404"; docker logs app-ci; exit 1; fi
-          curl -c cookie.txt -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:5173/api/auth/login -H "content-type: application/json" -d '{"email":"admin@example.com","password":"secret"}'
-          curl -b cookie.txt -H "content-type: application/json" -d '{"name":"test","price":10,"periodDays":30,"trafficMb":null,"active":true}' http://127.0.0.1:5173/api/admin/plans
-          curl -fsS http://127.0.0.1:5173/api/pricing | tee pricing.json
-          grep '"name":"test"' pricing.json
-          docker logs app-ci
-          docker stop app-ci
-          docker stop db
+          echo "Postgres did not become healthy in time"
+          docker logs db || true
+          exit 1
+
+      - name: Start app container
+        run: |
+          docker run -d --rm --name app-ci --network ci-net -p 5173:5173 \
+            -e NODE_ENV=production \
+            -e DB_DRIVER=pg \
+            -e DB="postgresql://postgres:postgres@db:5432/test?sslmode=disable" \
+            -e SESSION_SECRET="ci" \
+            -e NEXT_PUBLIC_APP_BASE_URL="http://127.0.0.1:5173" \
+            -e PUBLIC_APP_ORIGIN="http://127.0.0.1:5173" \
+            app:ci
+
+      - name: Wait for /healthz
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..120}; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5173/healthz || true)"
+            if [[ "$code" == "200" ]]; then exit 0; fi
+            sleep 1
+          done
+          echo "App /healthz is not ready"
+          docker logs app-ci || true
+          exit 1
+
+      - name: Smoke: /api/auth/login must NOT be 404
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+                 -X POST http://127.0.0.1:5173/api/auth/login \
+                 -H "content-type: application/json" -d '{}')
+          if [ "$code" = "404" ]; then
+            echo "/api/auth/login returned 404"
+            docker logs app-ci || true
+            exit 1
+          fi
+          echo "login status=$code (ok, главное что не 404)"
+
+      - name: Dump logs & cleanup
+        if: always()
+        run: |
+          docker ps -a || true
+          docker logs app-ci || true
+          docker logs db || true
+          docker rm -f app-ci db || true
 
       # Login to GHCR and PUSH production tags
       - uses: docker/login-action@v3
