@@ -9,22 +9,21 @@ import { apiFetch } from '@/react-app/api';
 interface VpnPlan {
   id: number;
   name: string;
-  price_cents: number;
-  period_days: number;
-  traffic_limit_gb: number | null;
-  features: string[];
-  is_active: boolean;
-  created_at: string;
+  price: number;
+  periodDays: number;
+  trafficMb: number | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface VpnPlanForm {
   id?: number;
   name: string;
-  price_rub: number;
-  period_days: number;
-  traffic_limit_gb: number | null;
-  features: string;
-  is_active: boolean;
+  price: number;
+  periodDays: number;
+  trafficMb: number | null;
+  active: boolean;
 }
 
 interface AdminUser {
@@ -97,13 +96,10 @@ export default function Admin() {
     try {
       const payload = {
         name: planData.name,
-        price_cents: Math.round(planData.price_rub * 100),
-        period_days: planData.period_days,
-        traffic_limit_gb: planData.traffic_limit_gb,
-        features: planData.features
-          ? planData.features.split(',').map((f) => f.trim()).filter(Boolean)
-          : [],
-        is_active: planData.is_active,
+        price: planData.price,
+        periodDays: planData.periodDays,
+        trafficMb: planData.trafficMb,
+        active: planData.active,
       };
       const method = planData.id ? 'PUT' : 'POST';
       const url = planData.id ? `/api/admin/plans/${planData.id}` : '/api/admin/plans';
@@ -139,15 +135,15 @@ export default function Admin() {
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('ru-RU');
+    const dt = new Date(dateStr);
+    return isNaN(+dt) ? '—' : dt.toLocaleString('ru-RU');
   };
 
-  const formatPrice = (priceCents: number) => {
+  const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-      minimumFractionDigits: 0,
-    }).format(priceCents / 100);
+    }).format(price);
   };
 
   if (loading) {
@@ -309,21 +305,21 @@ export default function Admin() {
                       <td className="p-4">
                         <div className="text-white font-medium">{plan.name}</div>
                       </td>
-                      <td className="p-4 text-slate-300">{formatPrice(plan.price_cents)}</td>
-                      <td className="p-4 text-slate-300">{plan.period_days}</td>
-                      <td className="p-4 text-slate-300">{plan.traffic_limit_gb ? `${plan.traffic_limit_gb} ГБ` : 'Безлимит'}</td>
+                      <td className="p-4 text-slate-300">{formatPrice(plan.price)}</td>
+                      <td className="p-4 text-slate-300">{plan.periodDays}</td>
+                      <td className="p-4 text-slate-300">{plan.trafficMb ? `${plan.trafficMb} МБ` : 'Безлимит'}</td>
                       <td className="p-4">
                         <span
                           className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                            plan.is_active
+                            plan.active
                               ? 'bg-green-500/20 text-green-400'
                               : 'bg-red-500/20 text-red-400'
                           }`}
                         >
-                          {plan.is_active ? 'Активен' : 'Отключен'}
+                          {plan.active ? 'Активен' : 'Отключен'}
                         </span>
                       </td>
-                      <td className="p-4 text-slate-300">{formatDate(plan.created_at)}</td>
+                      <td className="p-4 text-slate-300">{formatDate(plan.createdAt)}</td>
                       <td className="p-4">
                         <div className="flex items-center space-x-2">
                           <button
@@ -335,7 +331,7 @@ export default function Admin() {
                           >
                             <Edit className="w-4 h-4" />
                           </button>
-                          {plan.is_active ? (
+                          {plan.active ? (
                             <button
                               onClick={() => handleDeactivatePlan(plan.id)}
                               className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"

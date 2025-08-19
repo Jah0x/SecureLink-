@@ -43,8 +43,8 @@ npm run build && npm run smoke:head
 - `SESSION_SECRET` – секрет подписи JWT‑сессии
 - `ADMIN_EMAILS` – список e-mail администраторов через запятую
 - `FIRST_USER_ADMIN` – если `true`, первый зарегистрированный пользователь становится администратором
-- `NEXT_PUBLIC_API_BASE_URL` – базовый URL API (обычно `https://dashboard.zerologsvpn.com`)
-- `PUBLIC_APP_ORIGIN` – базовый origin приложения для генерации публичных ссылок
+- `NEXT_PUBLIC_API_BASE_URL` – базовый URL API (обычно `https://dashboard.securesoft.dev`)
+- `PUBLIC_APP_ORIGIN` – базовый origin приложения для генерации публичных ссылок (обязателен)
 - `DB` – строка подключения к базе данных (`postgresql://` или `sqlite:///`)
 - `FIRST_ADMIN_EMAIL` и `FIRST_ADMIN_PASSWORD` – учётные данные первого администратора; запись создаётся автоматически, если таблица `users` пустая
 - `SKIP_RUNTIME_MIGRATIONS` – пропустить миграции при старте (обычно `1` в проде)
@@ -62,6 +62,27 @@ npm run db:push  # применение миграций
 Если при выполнении миграций появляется ошибка `Error please install required packages: drizzle-orm`, запустите `npm install` — пакет `drizzle-orm` должен присутствовать в `node_modules`.
 
 При старте контейнера `bootstrap.sh` также выполняет `drizzle-kit push`, поэтому недостающие миграции накатываются автоматически.
+
+## Тарифные планы и API
+
+Схема таблицы `plans`:
+
+- `id BIGSERIAL PRIMARY KEY`
+- `name TEXT NOT NULL`
+- `price NUMERIC(12,2) NOT NULL`
+- `period_days INTEGER NOT NULL`
+- `traffic_mb INTEGER NULL`
+- `is_active BOOLEAN NOT NULL DEFAULT true`
+- `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+- `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+
+API возвращает объекты вида `{ id, name, price, periodDays, trafficMb, active, createdAt, updatedAt }`. Публичный список доступен по `GET /api/pricing`, админский CRUD работает через `/api/admin/plans`.
+
+Для обновления старой схемы выполните вручную:
+
+```bash
+psql "$DB" < sql/migrations/2025-08-fix-plans.sql
+```
 
 ## Сидер администратора
 

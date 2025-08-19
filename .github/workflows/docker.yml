@@ -29,17 +29,27 @@ jobs:
       # Smoke test: run container and curl endpoints
       - name: Run container for smoke test
         run: |
-          docker run -d --rm --name app-ci -p 5173:5173 app:ci
+          docker run -d --rm --name db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=test -p 5432:5432 postgres:16
+          docker run -d --rm --name app-ci --link db -p 5173:5173 \
+            -e DB=postgresql://postgres:postgres@db:5432/test?sslmode=disable \
+            -e MIGRATE_ON_BOOT=1 \
+            -e FIRST_ADMIN_EMAIL=admin@example.com \
+            -e FIRST_ADMIN_PASSWORD=secret \
+            app:ci
           for i in $(seq 1 30); do
             sleep 2
             if curl -fsS http://127.0.0.1:5173/healthz >/dev/null; then break; fi
             if [ $i -eq 30 ]; then echo "healthz failed"; docker logs app-ci; exit 1; fi
           done
-          # API must not be 404
           code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:5173/api/auth/login -H "content-type: application/json" -d '{}')
           if [ "$code" = "404" ]; then echo "/api/auth/login returned 404"; docker logs app-ci; exit 1; fi
+          curl -c cookie.txt -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:5173/api/auth/login -H "content-type: application/json" -d '{"email":"admin@example.com","password":"secret"}'
+          curl -b cookie.txt -H "content-type: application/json" -d '{"name":"test","price":10,"periodDays":30,"trafficMb":null,"active":true}' http://127.0.0.1:5173/api/admin/plans
+          curl -fsS http://127.0.0.1:5173/api/pricing | tee pricing.json
+          grep '"name":"test"' pricing.json
           docker logs app-ci
           docker stop app-ci
+          docker stop db
 
       # Login to GHCR and PUSH production tags
       - uses: docker/login-action@v3

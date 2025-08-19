@@ -5,8 +5,10 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
-import { users, plans, planFeatures, affiliates, affiliateClicks, affiliateLinks, affiliateStats } from '../db/schema'
+import { users, plans, affiliates, affiliateClicks, affiliateLinks, affiliateStats } from '../db/schema'
 import { eq, inArray, desc, sql, and, gte, lte } from 'drizzle-orm'
+import { z } from 'zod'
+import { mapPlanRow } from '../server/mappers/plan'
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
 import { getDb } from '../db'
@@ -46,6 +48,14 @@ async function syncAdmins(db: any) {
     }
   }
 }
+
+const PlanInput = z.object({
+  name: z.string().min(1),
+  price: z.number().nonnegative(),
+  periodDays: z.number().int().positive(),
+  trafficMb: z.number().int().positive().nullable(),
+  active: z.boolean(),
+})
 
 async function requireDb(c: any, next: any) {
   const db = getDb()
@@ -302,14 +312,14 @@ if (AUTH_MODE === 'proxy') {
     return c.json(inserted[0], 201)
   })
 
-  app.get('/api/plans', requireDb, async (c) => {
+  app.get('/api/pricing', requireDb, async (c) => {
     const db = c.get('db')
     const rows = await db
       .select()
       .from(plans)
-      .where(eq(plans.active, true))
+      .where(eq(plans.is_active, true))
       .orderBy(desc(plans.id))
-    return c.json(rows)
+    return c.json(rows.map(mapPlanRow))
   })
 
   app.get('/api/admin/plans', requireAuth, requireAdmin, requireDb, async (c) => {
@@ -318,12 +328,12 @@ if (AUTH_MODE === 'proxy') {
     const limit = Number(c.req.query('limit') || '50')
     const q = (c.req.query('active') || 'all').toLowerCase()
     let condition
-    if (['1', 'true', 'active'].includes(q)) condition = eq(plans.active, true)
-    else if (['0', 'false', 'inactive'].includes(q)) condition = eq(plans.active, false)
+    if (['1', 'true', 'active'].includes(q)) condition = eq(plans.is_active, true)
+    else if (['0', 'false', 'inactive'].includes(q)) condition = eq(plans.is_active, false)
     let query = db.select().from(plans)
     if (condition) query = query.where(condition)
     const rows = await query.orderBy(desc(plans.id)).limit(limit).offset(offset)
-    return c.json(rows)
+    return c.json(rows.map(mapPlanRow))
   })
 
   app.get('/api/admin/plans/:id', requireAuth, requireAdmin, requireDb, async (c) => {
@@ -332,66 +342,66 @@ if (AUTH_MODE === 'proxy') {
     const rows = await db.select().from(plans).where(eq(plans.id, id)).limit(1)
     const plan = rows[0]
     if (!plan) return c.json({ error: 'not_found' }, 404)
-    return c.json(plan)
+    return c.json(mapPlanRow(plan))
   })
 
   app.post('/api/admin/plans', requireAuth, requireAdmin, requireDb, async (c) => {
     const db = c.get('db')
     const body = await c.req.json()
-    const { name, price_cents, active = true } = body || {}
-    if (!name || name.length < 1 || name.length > 100) {
-      return c.json({ error: 'invalid_name', field: 'name' }, 400)
+    const parsed = PlanInput.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: 'invalid_input', details: parsed.error.flatten() }, 400)
     }
-    if (!Number.isInteger(price_cents) || price_cents <= 0) {
-      return c.json({ error: 'invalid_price', field: 'price_cents' }, 400)
-    }
+    const data = parsed.data
     const inserted = await db
       .insert(plans)
-      .values({ name, priceCents: price_cents, active })
+      .values({
+        name: data.name,
+        price: data.price,
+        period_days: data.periodDays,
+        traffic_mb: data.trafficMb,
+        is_active: data.active,
+      })
       .returning()
-    return c.json(inserted[0], 201)
+    return c.json(mapPlanRow(inserted[0]), 201)
   })
 
   app.put('/api/admin/plans/:id', requireAuth, requireAdmin, requireDb, async (c) => {
     const db = c.get('db')
     const id = Number(c.req.param('id'))
     const body = await c.req.json()
+    const parsed = PlanInput.partial().safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: 'invalid_input', details: parsed.error.flatten() }, 400)
+    }
+    const data = parsed.data
     const updates: any = {}
-    if (body.name !== undefined) {
-      if (!body.name || body.name.length < 1 || body.name.length > 100) {
-        return c.json({ error: 'invalid_name', field: 'name' }, 400)
-      }
-      updates.name = body.name
-    }
-    if (body.price_cents !== undefined) {
-      if (!Number.isInteger(body.price_cents) || body.price_cents <= 0) {
-        return c.json({ error: 'invalid_price', field: 'price_cents' }, 400)
-      }
-      updates.priceCents = body.price_cents
-    }
-    if (body.active !== undefined) {
-      updates.active = !!body.active
-    }
+    if (data.name !== undefined) updates.name = data.name
+    if (data.price !== undefined) updates.price = data.price
+    if (data.periodDays !== undefined) updates.period_days = data.periodDays
+    if (data.trafficMb !== undefined) updates.traffic_mb = data.trafficMb
+    if (data.active !== undefined) updates.is_active = data.active
     if (Object.keys(updates).length) {
+      updates.updated_at = new Date()
       await db.update(plans).set(updates).where(eq(plans.id, id))
     }
     const rows = await db.select().from(plans).where(eq(plans.id, id)).limit(1)
     const plan = rows[0]
     if (!plan) return c.json({ error: 'not_found' }, 404)
-    return c.json(plan)
+    return c.json(mapPlanRow(plan))
   })
 
   app.delete('/api/admin/plans/:id', requireAuth, requireAdmin, requireDb, async (c) => {
     const db = c.get('db')
     const id = Number(c.req.param('id'))
-    await db.update(plans).set({ active: false }).where(eq(plans.id, id))
+    await db.update(plans).set({ is_active: false, updated_at: new Date() }).where(eq(plans.id, id))
     return c.json({ ok: true })
   })
 
   app.post('/api/admin/plans/:id/activate', requireAuth, requireAdmin, requireDb, async (c) => {
     const db = c.get('db')
     const id = Number(c.req.param('id'))
-    await db.update(plans).set({ active: true }).where(eq(plans.id, id))
+    await db.update(plans).set({ is_active: true, updated_at: new Date() }).where(eq(plans.id, id))
     return c.json({ ok: true })
   })
 
@@ -440,8 +450,7 @@ if (AUTH_MODE === 'proxy') {
       const clicks = clicksRes[0]?.cnt || 0
       const origin =
         process.env.PUBLIC_APP_ORIGIN ||
-        (new URL(c.req.url)).origin ||
-        'https://dashboard.securesoft.dev'
+        (new URL(c.req.url)).origin
 
       return c.json({
         code: aff.code,
