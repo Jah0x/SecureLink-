@@ -65,3 +65,4 @@
 - Устранена ошибка `RequestInit: duplex option is required`: тела запросов в Express→Hono всегда буферизуются, Docker-образ создаёт каталог `/app/data` и выдаёт права на `/app`, а реферальные ссылки используют origin из окружения `PUBLIC_APP_ORIGIN`.
 
 - Переработана схема тарифов: БД хранит `price` (NUMERIC), `period_days`, `traffic_mb` и флаг `is_active`; добавлен маппер `mapPlanRow`, нормализованы типы pg и API возвращает `price` как number. Фронтенд и админка перешли на camelCase‑контракты, добавлен ErrorBoundary, CI создаёт тестовый план и проверяет `/api/pricing`.
+- Исправлена установка cookie по умолчанию: домен опционален, что позволяет смоук‑тесту авторизоваться на localhost.
