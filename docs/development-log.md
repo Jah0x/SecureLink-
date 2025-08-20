@@ -71,3 +71,4 @@
 
 - Исправлен CI workflow GitHub Actions: валидный YAML, сборка и смоук‑тест контейнера с Postgres и логами.
 - Упрощён CI: удалён smoke‑test, docker-образ публикуется в GHCR с тегами `latest` и `sha-<commit>` при пуше в `main`.
+- Приведение имени репозитория и тега образа к нижнему регистру в docker‑workflow перед публикацией в GHCR.
