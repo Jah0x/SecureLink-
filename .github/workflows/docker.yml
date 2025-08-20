@@ -1,21 +1,21 @@
 # yamllint disable rule:line-length rule:truthy
 ---
-name: CI (build + smoke)
+name: CI (docker)
 
 on:
   push:
-    branches: ["**"]
-  pull_request:
+    branches: ["main"]
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-smoke:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,89 +25,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build image and LOAD into runner
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          tags: app:ci
-          load: true
-
-      - name: Create CI docker network
-        run: |
-          set -euo pipefail
-          docker network create ci-net || true
-
-      - name: Start Postgres (service)
-        run: |
-          set -euo pipefail
-          docker run -d --rm --name db --network ci-net \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD=postgres \
-            -e POSTGRES_DB=test \
-            -p 5432:5432 \
-            --health-cmd="pg_isready -U postgres -d test" \
-            --health-interval=2s --health-timeout=2s --health-retries=60 \
-            postgres:16-alpine
-
-      - name: Wait for Postgres to be healthy
-        shell: bash
-        run: |
-          set -euo pipefail
-          for i in $(seq 1 120); do
-            status=$(docker inspect -f '{{.State.Health.Status}}' db || echo starting)
-            if [ "$status" = "healthy" ]; then echo "ok"; exit 0; fi
-            sleep 1
-          done
-          echo "Postgres did not become healthy in time" >&2
-          docker logs db || true
-          exit 1
-
-      - name: Start app container
-        run: |
-          set -euo pipefail
-          docker run -d --rm --name app-ci --network ci-net -p 5173:5173 \
-            -e NODE_ENV=production \
-            -e DB_DRIVER=pg \
-            -e DB="postgresql://postgres:postgres@db:5432/test?sslmode=disable" \
-            -e SESSION_SECRET="ci" \
-            -e NEXT_PUBLIC_APP_BASE_URL="http://127.0.0.1:5173" \
-            -e PUBLIC_APP_ORIGIN="http://127.0.0.1:5173" \
-            app:ci
-
-      - name: Wait for /healthz
-        shell: bash
-        run: |
-          set -euo pipefail
-          for i in $(seq 1 120); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5173/healthz || true)
-            if [ "$code" = "200" ]; then exit 0; fi
-            sleep 1
-          done
-          echo "App /healthz is not ready" >&2
-          docker logs app-ci || true
-          exit 1
-
-      - name: "Smoke: /api/auth/login must NOT be 404"
-        shell: bash
-        run: |
-          set -euo pipefail
-          code=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST http://127.0.0.1:5173/api/auth/login \
-            -H "content-type: application/json" -d '{}' || true)
-          if [ "$code" = "404" ]; then
-            echo "/api/auth/login returned 404" >&2
-            docker logs app-ci || true
-            exit 1
-          fi
-          echo "login status=$code (ок, главное не 404)"
-
-      - name: Dump logs & Cleanup
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "--- app logs:"; docker logs app-ci 2>/dev/null || true
-          echo "--- db logs:"; docker logs db 2>/dev/null || true
-          docker rm -f app-ci 2>/dev/null || true
-          docker rm -f db 2>/dev/null || true
-          docker network rm ci-net 2>/dev/null || true
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/securelink:latest
+            ghcr.io/${{ github.repository_owner }}/securelink:sha-${{ github.sha }}

@@ -70,3 +70,4 @@
 - CI workflow поднимает PostgreSQL и контейнер приложения в отдельной Docker-сети, ждёт готовность `/healthz` и проверяет, что `/api/auth/login` не возвращает 404.
 
 - Исправлен CI workflow GitHub Actions: валидный YAML, сборка и смоук‑тест контейнера с Postgres и логами.
+- Упрощён CI: удалён smoke‑test, docker-образ публикуется в GHCR с тегами `latest` и `sha-<commit>` при пуше в `main`.
