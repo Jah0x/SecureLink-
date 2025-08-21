@@ -42,7 +42,8 @@
     "typescript": "^5.5.0",
     "typescript-eslint": "8.31.0",
     "vite": "^5.4.0",
-    "wrangler": "^4.25.0"
+    "wrangler": "^4.25.0",
+    "pg-mem": "^3.0.5"
   },
   "scripts": {
     "build": "tsc -b && tscpaths -p tsconfig.json -s ./src -o ./dist && vite build",
@@ -52,6 +53,7 @@
     "migrate:generate": "drizzle-kit generate --config ./drizzle.config.ts",
     "lint": "eslint .",
     "smoke:head": "tsx scripts/smoke-head.ts",
+    "test": "tsx --test src/**/*.test.ts",
     "dev:server": "tsx watch src/server/index.ts",
     "dev:vite": "vite",
     "check:aliases": "node -e \"const fs=require('fs'); const t=fs.readFileSync('dist/worker/index.js','utf8'); if(/@\\//.test(t)){console.error('alias @/ found in dist'); process.exit(1)} else console.log('aliases OK')\"",

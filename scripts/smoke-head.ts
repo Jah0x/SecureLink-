@@ -9,6 +9,17 @@ function head(path: string) {
   });
 }
 
+function get(path: string) {
+  return new Promise<number>((res, rej) => {
+    const r = http.request({ host: '127.0.0.1', port: 5173, path, method: 'GET' }, (rs) => {
+      rs.resume();
+      res(rs.statusCode || 0);
+    });
+    r.on('error', rej);
+    r.end();
+  });
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
@@ -35,6 +46,14 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       return;
     }
     console.log('HEAD / OK:', ct);
+
+    const st = await get('/api/pricing');
+    if (st === 500) {
+      console.error('GET /api/pricing returned 500');
+      process.exitCode = 1;
+      return;
+    }
+    console.log('GET /api/pricing status:', st);
   } finally {
     server.kill();
   }

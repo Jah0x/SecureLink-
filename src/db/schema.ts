@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, index, bigserial, numeric } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, index } from "drizzle-orm/pg-core";
 // Если DB=sqlite — Drizzle сам подставит sqlite-диалект по конфигу.
 
 export const users = pgTable("users", {
@@ -10,14 +10,14 @@ export const users = pgTable("users", {
 });
 
 export const plans = pgTable("plans", {
-  id: bigserial("id", { mode: "number" }).primaryKey(),
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  price: numeric("price", { precision: 12, scale: 2 }).notNull(),
-  period_days: integer("period_days").notNull(),
+  price_cents: integer("price_cents").notNull(),
+  period_days: integer("period_days").notNull().default(30),
   traffic_mb: integer("traffic_mb"),
   is_active: boolean("is_active").notNull().default(true),
-  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const planFeatures = pgTable("plan_features", {
