@@ -1,5 +1,6 @@
 {
   "entries": [
-    { "idx": 0, "when": 0, "tag": "0000_initial", "breakpoints": false }
+    { "idx": 0, "when": 0, "tag": "0000_initial", "breakpoints": false },
+    { "idx": 1, "when": 1, "tag": "0001_plans", "breakpoints": false }
   ]
 }

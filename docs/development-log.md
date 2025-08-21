@@ -73,3 +73,4 @@
 - Упрощён CI: удалён smoke‑test, docker-образ публикуется в GHCR с тегами `latest` и `sha-<commit>` при пуше в `main`.
 - Приведение имени репозитория и тега образа к нижнему регистру в docker‑workflow перед публикацией в GHCR.
 - Гарантировано корректное имя Docker-образа в GHCR: вычисляется безопасный `ghcr.io/<owner>/securelink` и публикуются теги `latest` и `sha-<commit>` без хвостовых дефисов и в нижнем регистре.
+- Схема тарифов возвращена к хранению `price_cents` (INTEGER), добавлены `period_days`, `traffic_mb`, `is_active`, `created_at`, `updated_at` с триггером обновления; Drizzle-схема и миграции синхронизированы, добавлены unit-тесты CRUD планов.

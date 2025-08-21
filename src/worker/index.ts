@@ -358,7 +358,7 @@ if (AUTH_MODE === 'proxy') {
       .insert(plans)
       .values({
         name: data.name,
-        price: data.price,
+        price_cents: Math.round(data.price * 100),
         period_days: data.periodDays,
         traffic_mb: data.trafficMb,
         is_active: data.active,
@@ -378,7 +378,7 @@ if (AUTH_MODE === 'proxy') {
     const data = parsed.data
     const updates: any = {}
     if (data.name !== undefined) updates.name = data.name
-    if (data.price !== undefined) updates.price = data.price
+    if (data.price !== undefined) updates.price_cents = Math.round(data.price * 100)
     if (data.periodDays !== undefined) updates.period_days = data.periodDays
     if (data.trafficMb !== undefined) updates.traffic_mb = data.trafficMb
     if (data.active !== undefined) updates.is_active = data.active

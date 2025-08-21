@@ -59,30 +59,23 @@ npm run db:gen   # генерация SQL из схемы
 npm run db:push  # применение миграций
 ```
 
+Миграции выполняются вручную перед запуском приложения; автоматического `drizzle-kit push` при старте контейнера больше нет.
 Если при выполнении миграций появляется ошибка `Error please install required packages: drizzle-orm`, запустите `npm install` — пакет `drizzle-orm` должен присутствовать в `node_modules`.
-
-При старте контейнера `bootstrap.sh` также выполняет `drizzle-kit push`, поэтому недостающие миграции накатываются автоматически.
 
 ## Тарифные планы и API
 
 Схема таблицы `plans`:
 
-- `id BIGSERIAL PRIMARY KEY`
+- `id SERIAL PRIMARY KEY`
 - `name TEXT NOT NULL`
-- `price NUMERIC(12,2) NOT NULL`
-- `period_days INTEGER NOT NULL`
+- `price_cents INTEGER NOT NULL`
+- `period_days INTEGER NOT NULL DEFAULT 30`
 - `traffic_mb INTEGER NULL`
 - `is_active BOOLEAN NOT NULL DEFAULT true`
-- `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`
-- `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+- `created_at TIMESTAMP NOT NULL DEFAULT now()`
+- `updated_at TIMESTAMP NOT NULL DEFAULT now()`
 
 API возвращает объекты вида `{ id, name, price, periodDays, trafficMb, active, createdAt, updatedAt }`. Публичный список доступен по `GET /api/pricing`, админский CRUD работает через `/api/admin/plans`.
-
-Для обновления старой схемы выполните вручную:
-
-```bash
-psql "$DB" < sql/migrations/2025-08-fix-plans.sql
-```
 
 ## Сидер администратора
 

@@ -2,7 +2,7 @@ export function mapPlanRow(row: any) {
   return {
     id: row.id,
     name: row.name,
-    price: typeof row.price === 'number' ? row.price : Number(row.price),
+    price: (typeof row.price_cents === 'number' ? row.price_cents : Number(row.price_cents)) / 100,
     periodDays: Number(row.period_days),
     trafficMb: row.traffic_mb == null ? null : Number(row.traffic_mb),
     active: Boolean(row.is_active),
