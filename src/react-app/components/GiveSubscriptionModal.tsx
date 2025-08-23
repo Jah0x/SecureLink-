@@ -4,10 +4,11 @@ import { X } from 'lucide-react';
 interface VpnPlan {
   id: number;
   name: string;
-  price: number;
+  price_cents: number;
   periodDays: number;
   trafficMb: number | null;
   active: boolean;
+  is_demo: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,11 +65,11 @@ export default function GiveSubscriptionModal({
     }
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (priceCents: number) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-    }).format(price);
+    }).format(priceCents / 100);
   };
 
   if (!isOpen) return null;
@@ -120,15 +121,20 @@ export default function GiveSubscriptionModal({
                     onChange={() => setSelectedPlanId(plan.id)}
                     className="sr-only"
                   />
-                  <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start">
                     <div>
-                      <div className="text-white font-medium">{plan.name}</div>
+                      <div className="text-white font-medium flex items-center gap-2">
+                        {plan.name}
+                        {plan.is_demo && (
+                          <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">Демо</span>
+                        )}
+                      </div>
                       <div className="text-slate-300 text-sm mt-1">
                         {plan.periodDays} дн. • {plan.trafficMb ? `${plan.trafficMb} МБ` : 'Безлимит'}
                       </div>
                     </div>
                     <div className="text-blue-400 font-semibold">
-                      {formatPrice(plan.price)}
+                      {plan.is_demo ? 'Демо' : formatPrice(plan.price_cents)}
                     </div>
                   </div>
                 </label>

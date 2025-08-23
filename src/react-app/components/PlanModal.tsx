@@ -4,10 +4,11 @@ import { X } from 'lucide-react';
 interface VpnPlan {
   id: number;
   name: string;
-  price: number;
+  price_cents: number;
   periodDays: number;
   trafficMb: number | null;
   active: boolean;
+  is_demo: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -15,10 +16,11 @@ interface VpnPlan {
 interface VpnPlanForm {
   id?: number;
   name: string;
-  price: number;
+  price_cents: number;
   periodDays: number;
   trafficMb: number | null;
   active: boolean;
+  is_demo: boolean;
 }
 
 interface PlanModalProps {
@@ -31,10 +33,11 @@ interface PlanModalProps {
 export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalProps) {
   const [formData, setFormData] = useState<VpnPlanForm>({
     name: '',
-    price: 0,
+    price_cents: 0,
     periodDays: 30,
     trafficMb: null,
     active: true,
+    is_demo: false,
   });
 
   useEffect(() => {
@@ -42,18 +45,20 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
       setFormData({
         id: plan.id,
         name: plan.name,
-        price: plan.price,
+        price_cents: plan.price_cents,
         periodDays: plan.periodDays,
         trafficMb: plan.trafficMb,
         active: plan.active,
+        is_demo: plan.is_demo,
       })
     } else {
       setFormData({
         name: '',
-        price: 0,
+        price_cents: 0,
         periodDays: 30,
         trafficMb: null,
         active: true,
+        is_demo: false,
       })
     }
   }, [plan]);
@@ -64,7 +69,7 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
       alert('Название должно быть от 1 до 100 символов');
       return;
     }
-    if (formData.price <= 0) {
+    if (!formData.is_demo && formData.price_cents <= 0) {
       alert('Цена должна быть больше 0');
       return;
     }
@@ -132,10 +137,13 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
               <input
                 type="number"
                 min="0"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) })}
+                value={formData.price_cents / 100}
+                onChange={(e) =>
+                  setFormData({ ...formData, price_cents: Math.round(parseFloat(e.target.value) * 100) })
+                }
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                disabled={formData.is_demo}
               />
             </div>
           </div>
@@ -169,6 +177,25 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
             />
             <label htmlFor="is_active" className="ml-2 text-sm text-slate-300">
               Активный план
+            </label>
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="is_demo"
+              checked={formData.is_demo}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  is_demo: e.target.checked,
+                  price_cents: e.target.checked ? 0 : formData.price_cents,
+                })
+              }
+              className="w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="is_demo" className="ml-2 text-sm text-slate-300">
+              Демо-тариф
             </label>
           </div>
 

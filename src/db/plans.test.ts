@@ -8,6 +8,7 @@ interface PlanRow {
   period_days: number;
   traffic_mb: number | null;
   is_active: boolean;
+  is_demo: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -17,7 +18,7 @@ class InMemoryPlanRepo {
   private seq = 1;
 
   create(data: Omit<PlanRow, 'id' | 'created_at' | 'updated_at'>): PlanRow {
-    const row: PlanRow = { id: this.seq++, created_at: new Date(), updated_at: new Date(), ...data };
+    const row: PlanRow = { id: this.seq++, created_at: new Date(), updated_at: new Date(), is_demo: false, ...data };
     this.rows.push(row);
     return row;
   }
@@ -36,7 +37,7 @@ class InMemoryPlanRepo {
 
 test('create, update and list active plans', () => {
   const repo = new InMemoryPlanRepo();
-  const plan = repo.create({
+    const plan = repo.create({
     name: 'Basic',
     price_cents: 1000,
     period_days: 30,

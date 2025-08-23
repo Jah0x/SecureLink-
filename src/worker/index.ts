@@ -5,7 +5,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
-import { users, plans, affiliates, affiliateClicks, affiliateLinks, affiliateStats } from '../db/schema'
+import { users, plans, subscriptions, affiliates, affiliateClicks, affiliateLinks, affiliateStats } from '../db/schema'
 import { eq, inArray, desc, sql, and, gte, lte } from 'drizzle-orm'
 import { z } from 'zod'
 import { mapPlanRow } from '../server/mappers/plan'
@@ -51,10 +51,11 @@ async function syncAdmins(db: any) {
 
 const PlanInput = z.object({
   name: z.string().min(1),
-  price: z.number().nonnegative(),
+  price_cents: z.number().int().nonnegative(),
   periodDays: z.number().int().positive(),
   trafficMb: z.number().int().positive().nullable(),
   active: z.boolean(),
+  is_demo: z.boolean().optional(),
 })
 
 async function requireDb(c: any, next: any) {
@@ -358,10 +359,11 @@ if (AUTH_MODE === 'proxy') {
       .insert(plans)
       .values({
         name: data.name,
-        price_cents: Math.round(data.price * 100),
+        price_cents: data.is_demo ? 0 : data.price_cents,
         period_days: data.periodDays,
         traffic_mb: data.trafficMb,
         is_active: data.active,
+        is_demo: data.is_demo ?? false,
       })
       .returning()
     return c.json(mapPlanRow(inserted[0]), 201)
@@ -378,10 +380,14 @@ if (AUTH_MODE === 'proxy') {
     const data = parsed.data
     const updates: any = {}
     if (data.name !== undefined) updates.name = data.name
-    if (data.price !== undefined) updates.price_cents = Math.round(data.price * 100)
+    if (data.price_cents !== undefined) updates.price_cents = data.price_cents
     if (data.periodDays !== undefined) updates.period_days = data.periodDays
     if (data.trafficMb !== undefined) updates.traffic_mb = data.trafficMb
     if (data.active !== undefined) updates.is_active = data.active
+    if (data.is_demo !== undefined) {
+      updates.is_demo = data.is_demo
+      if (data.is_demo) updates.price_cents = 0
+    }
     if (Object.keys(updates).length) {
       updates.updated_at = new Date()
       await db.update(plans).set(updates).where(eq(plans.id, id))
@@ -404,6 +410,27 @@ if (AUTH_MODE === 'proxy') {
     const id = Number(c.req.param('id'))
     await db.update(plans).set({ is_active: true, updated_at: new Date() }).where(eq(plans.id, id))
     return c.json({ ok: true })
+  })
+
+  app.post('/api/demo', requireAuth, requireDb, async (c) => {
+    const db = c.get('db')
+    const user = c.get('user')
+    const demoPlanRows = await db
+      .select()
+      .from(plans)
+      .where(and(eq(plans.is_demo, true), eq(plans.is_active, true)))
+      .limit(1)
+    const plan = demoPlanRows[0]
+    if (!plan) return c.json({ error: 'no_demo_plan' }, 404)
+    const existing = await db
+      .select({ id: subscriptions.id })
+      .from(subscriptions)
+      .where(and(eq(subscriptions.userId, user.sub), eq(subscriptions.planId, plan.id)))
+      .limit(1)
+    if (existing.length) return c.json({ error: 'already_used_demo' }, 403)
+    const expiresAt = new Date(Date.now() + Number(plan.period_days) * 24 * 3600 * 1000)
+    await db.insert(subscriptions).values({ userId: user.sub, planId: plan.id, expiresAt })
+    return c.json({ ok: true }, 201)
   })
 
   if (FEATURE_REFERRALS) {

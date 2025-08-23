@@ -9,10 +9,11 @@ import { apiFetch } from '@/react-app/api';
 interface VpnPlan {
   id: number;
   name: string;
-  price: number;
+  price_cents: number;
   periodDays: number;
   trafficMb: number | null;
   active: boolean;
+  is_demo: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -20,10 +21,11 @@ interface VpnPlan {
 interface VpnPlanForm {
   id?: number;
   name: string;
-  price: number;
+  price_cents: number;
   periodDays: number;
   trafficMb: number | null;
   active: boolean;
+  is_demo: boolean;
 }
 
 interface AdminUser {
@@ -96,10 +98,11 @@ export default function Admin() {
     try {
       const payload = {
         name: planData.name,
-        price: planData.price,
+        price_cents: planData.price_cents,
         periodDays: planData.periodDays,
         trafficMb: planData.trafficMb,
         active: planData.active,
+        is_demo: planData.is_demo,
       };
       const method = planData.id ? 'PUT' : 'POST';
       const url = planData.id ? `/api/admin/plans/${planData.id}` : '/api/admin/plans';
@@ -139,11 +142,11 @@ export default function Admin() {
     return isNaN(+dt) ? '—' : dt.toLocaleString('ru-RU');
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (priceCents: number) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-    }).format(price);
+    }).format(priceCents / 100);
   };
 
   if (loading) {
@@ -303,9 +306,14 @@ export default function Admin() {
                   {plans.map((plan) => (
                     <tr key={plan.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
                       <td className="p-4">
-                        <div className="text-white font-medium">{plan.name}</div>
+                        <div className="text-white font-medium flex items-center gap-2">
+                          {plan.name}
+                          {plan.is_demo && (
+                            <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">Демо</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="p-4 text-slate-300">{formatPrice(plan.price)}</td>
+                      <td className="p-4 text-slate-300">{formatPrice(plan.price_cents)}</td>
                       <td className="p-4 text-slate-300">{plan.periodDays}</td>
                       <td className="p-4 text-slate-300">{plan.trafficMb ? `${plan.trafficMb} МБ` : 'Безлимит'}</td>
                       <td className="p-4">
