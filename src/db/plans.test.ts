@@ -17,8 +17,18 @@ class InMemoryPlanRepo {
   private rows: PlanRow[] = [];
   private seq = 1;
 
-  create(data: Omit<PlanRow, 'id' | 'created_at' | 'updated_at'>): PlanRow {
-    const row: PlanRow = { id: this.seq++, created_at: new Date(), updated_at: new Date(), is_demo: false, ...data };
+  create(
+    data: Omit<PlanRow, 'id' | 'created_at' | 'updated_at' | 'is_demo'> & {
+      is_demo?: boolean;
+    },
+  ): PlanRow {
+    const row: PlanRow = {
+      id: this.seq++,
+      created_at: new Date(),
+      updated_at: new Date(),
+      is_demo: false,
+      ...data,
+    };
     this.rows.push(row);
     return row;
   }
