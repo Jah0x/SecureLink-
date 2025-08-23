@@ -75,7 +75,7 @@ npm run db:push  # применение миграций
 - `created_at TIMESTAMP NOT NULL DEFAULT now()`
 - `updated_at TIMESTAMP NOT NULL DEFAULT now()`
 
-API возвращает объекты вида `{ id, name, price, periodDays, trafficMb, active, createdAt, updatedAt }`. Публичный список доступен по `GET /api/pricing`, админский CRUD работает через `/api/admin/plans`.
+API возвращает объекты вида `{ id, name, price_cents, periodDays, trafficMb, active, is_demo, createdAt, updatedAt }`. Публичный список доступен по `GET /api/pricing`, админский CRUD работает через `/api/admin/plans`.
 
 ## Сидер администратора
 

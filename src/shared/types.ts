@@ -49,10 +49,11 @@ export const VpnConnectionSchema = z.object({
 export const VpnPlanSchema = z.object({
   id: z.number(),
   name: z.string(),
-  price: z.number(),
+  price_cents: z.number(),
   periodDays: z.number(),
   trafficMb: z.number().nullable(),
   active: z.boolean(),
+  is_demo: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

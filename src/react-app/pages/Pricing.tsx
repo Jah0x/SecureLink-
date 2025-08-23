@@ -7,10 +7,11 @@ import { Check, Shield, Zap, Globe } from 'lucide-react';
 interface VpnPlan {
   id: number;
   name: string;
-  price: number;
+  price_cents: number;
   periodDays: number;
   trafficMb: number | null;
   active: boolean;
+  is_demo: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,26 +69,37 @@ export default function Pricing() {
     fetchPlans();
   }, [user, navigate]);
 
-  const handlePurchase = async (planId: number) => {
-    setPurchasing(planId);
-    
-    try {
-      const response = await fetch('/api/purchase', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ planId }),
-      });
+  const handlePurchase = async (plan: VpnPlan) => {
+    setPurchasing(plan.id);
 
-      if (response.ok) {
-        const data = await response.json();
-        // В реальном приложении здесь будет редирект на платежную систему
-        alert(`Покупка инициирована! ID заказа: ${data.orderId}\nВ реальном приложении здесь будет редирект на платежную систему.`);
-        navigate('/dashboard');
+    try {
+      if (plan.is_demo) {
+        const resp = await fetch('/api/demo', { method: 'POST' });
+        if (resp.ok) {
+          alert('Демо активировано');
+          navigate('/dashboard');
+        } else if (resp.status === 403) {
+          alert('Демо уже использовано');
+        } else {
+          alert('Демо недоступно');
+        }
       } else {
-        const error = await response.json();
-        alert(`Ошибка: ${error.message}`);
+        const response = await fetch('/api/purchase', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ planId: plan.id }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          alert(`Покупка инициирована! ID заказа: ${data.orderId}\nВ реальном приложении здесь будет редирект на платежную систему.`);
+          navigate('/dashboard');
+        } else {
+          const error = await response.json();
+          alert(`Ошибка: ${error.message}`);
+        }
       }
     } catch (error) {
       console.error('Purchase error:', error);
@@ -97,11 +109,11 @@ export default function Pricing() {
     }
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (priceCents: number) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-    }).format(price);
+    }).format(priceCents / 100);
   };
 
   const getPopularBadge = (periodDays: number) => {
@@ -149,8 +161,15 @@ export default function Pricing() {
               {getPopularBadge(plan.periodDays)}
 
               <div className="text-center mb-8">
-                <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
-                <div className="text-3xl font-bold text-white mb-1">{formatPrice(plan.price)}</div>
+                <h3 className="text-xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+                  {plan.name}
+                  {plan.is_demo && (
+                    <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">Демо</span>
+                  )}
+                </h3>
+                <div className="text-3xl font-bold text-white mb-1">
+                  {plan.is_demo ? '0 ₽' : formatPrice(plan.price_cents)}
+                </div>
                 <p className="text-slate-400 text-sm">{plan.periodDays} дн.</p>
               </div>
 
@@ -165,11 +184,11 @@ export default function Pricing() {
               </div>
 
               <button
-                onClick={() => handlePurchase(plan.id)}
+                onClick={() => handlePurchase(plan)}
                 disabled={purchasing === plan.id}
                 className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-blue-500/20"
               >
-                {purchasing === plan.id ? 'Оформление...' : 'Купить план'}
+                {purchasing === plan.id ? 'Оформление...' : plan.is_demo ? 'Получить демо' : 'Купить план'}
               </button>
 
               <p className="text-slate-500 text-xs text-center mt-4">
