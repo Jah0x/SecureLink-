@@ -45,6 +45,12 @@ export default function Header() {
                   <span>Тарифы</span>
                 </Link>
                 <Link
+                  to="/subscription"
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${location.pathname === '/subscription' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}
+                >
+                  Подписка
+                </Link>
+                <Link
                   to="/earnings"
                   className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     location.pathname === '/earnings'
