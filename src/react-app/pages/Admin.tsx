@@ -3,7 +3,7 @@ import { useAuth } from '@/auth';
 import { useNavigate } from 'react-router';
 import Header from '@/react-app/components/Header';
 import PlanModal from '@/react-app/components/PlanModal';
-import { Users, CreditCard, Plus, Edit, Ban, Check, Link as LinkIcon } from 'lucide-react';
+import { Users, CreditCard, Plus, Edit, Ban, Check, Link as LinkIcon, Shield } from 'lucide-react';
 import { apiFetch } from '@/react-app/api';
 
 interface VpnPlan {
@@ -38,7 +38,7 @@ interface AdminUser {
 export default function Admin() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'affiliates'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'affiliates' | 'subs'>('users');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [plans, setPlans] = useState<VpnPlan[]>([]);
   const [affiliatesList, setAffiliatesList] = useState<any[]>([]);
@@ -47,6 +47,10 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<VpnPlan | null>(null);
+  const [searchLogin, setSearchLogin] = useState('');
+  const [subStatus, setSubStatus] = useState<any | null>(null);
+  const [subLink, setSubLink] = useState('');
+  const [subQr, setSubQr] = useState<string | null>(null);
   const handleAddUser = async () => {
     const email = prompt('Email пользователя');
     if (!email) return;
@@ -94,6 +98,33 @@ export default function Admin() {
     }
   };
 
+  const handleSubStatus = async () => {
+    const res = await fetch(`/api/subs/status?login=${encodeURIComponent(searchLogin)}`);
+    setSubLink('');
+    setSubQr(null);
+    setSubStatus(res.ok ? await res.json() : null);
+  };
+  const handleSubAssign = async () => {
+    await apiFetch('/api/subs/assign', { method: 'POST', body: JSON.stringify({ login: searchLogin }) });
+    await handleSubStatus();
+  };
+  const handleSubReassign = async () => {
+    await apiFetch('/api/subs/reassign', { method: 'POST', body: JSON.stringify({ login: searchLogin }) });
+    await handleSubStatus();
+  };
+  const handleSubRevoke = async () => {
+    await apiFetch('/api/subs/revoke', { method: 'POST', body: JSON.stringify({ login: searchLogin }) });
+    await handleSubStatus();
+  };
+  const handleSubLink = async () => {
+    const txt = await apiFetch(`/api/subs/link?login=${encodeURIComponent(searchLogin)}&fmt=plain`);
+    setSubLink(txt as string);
+  };
+  const handleSubQr = async () => {
+    const r = await fetch(`/api/subs/qrcode?login=${encodeURIComponent(searchLogin)}`);
+    const blob = await r.blob();
+    setSubQr(URL.createObjectURL(blob));
+  };
   const handleSavePlan = async (planData: VpnPlanForm) => {
     try {
       const payload = {
@@ -208,6 +239,17 @@ export default function Admin() {
           >
             <CreditCard className="w-4 h-4" />
             <span>Тарифные планы</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('subs')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'subs'
+                ? 'bg-blue-500 text-white'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            <span>Подписки</span>
           </button>
           {REF_ENABLED && (
             <button
@@ -361,6 +403,39 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+        {activeTab === 'subs' && (
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 space-y-4">
+            <div className="flex space-x-2">
+              <input
+                value={searchLogin}
+                onChange={(e) => setSearchLogin(e.target.value)}
+                placeholder="login"
+                className="flex-1 p-2 rounded bg-slate-700 text-white"
+              />
+              <button onClick={handleSubStatus} className="bg-blue-600 px-4 py-2 rounded">
+                Проверить
+              </button>
+            </div>
+            {subStatus ? (
+              <div className="space-y-2">
+                <p>UID: {subStatus.uid}</p>
+                <div className="space-x-2">
+                  <button onClick={handleSubReassign} className="bg-blue-600 px-2 py-1 rounded">Перевыдать</button>
+                  <button onClick={handleSubRevoke} className="bg-red-600 px-2 py-1 rounded">Отозвать</button>
+                  <button onClick={handleSubLink} className="bg-slate-600 px-2 py-1 rounded">Ссылка</button>
+                  <button onClick={handleSubQr} className="bg-slate-600 px-2 py-1 rounded">QR</button>
+                </div>
+                {subLink && <p className="break-all text-slate-300">{subLink}</p>}
+                {subQr && <img src={subQr} alt="QR" className="mt-2" />}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p>Нет активной подписки</p>
+                <button onClick={handleSubAssign} className="bg-green-600 px-2 py-1 rounded">Выдать</button>
+              </div>
+            )}
           </div>
         )}
 

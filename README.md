@@ -130,3 +130,31 @@ kubectl apply -f k8s/deployment.yaml
 ## Логи разработки
 
 Все заметки по изменениям фиксируются в файле `docs/development-log.md`.
+
+## Интеграция с сервером подписок
+
+Личный кабинет проксирует операции управления подписками в сервис `subs`. Для работы необходимо задать переменные окружения:
+
+- `SUBS_API_BASE` — базовый URL API сервиса подписок
+- `SUBS_API_TOKEN` — Bearer‑токен для записи
+- `SUBS_API_READONLY_TOKEN` — опциональный токен только для чтения
+
+### Примеры
+
+```bash
+# выдать подписку
+curl -X POST -H 'content-type: application/json' --cookie "session_token=<token>" \
+  http://localhost:5173/api/subs/assign -d '{"login":"user@example.com"}'
+
+# проверить статус
+curl --cookie "session_token=<token>" \
+  'http://localhost:5173/api/subs/status?login=user@example.com'
+
+# получить ссылку VLESS
+curl --cookie "session_token=<token>" \
+  'http://localhost:5173/api/subs/link?login=user@example.com&fmt=plain'
+
+# получить QR-код
+curl --cookie "session_token=<token>" \
+  'http://localhost:5173/api/subs/qrcode?login=user@example.com' > qr.png
+```

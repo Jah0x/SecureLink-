@@ -9,6 +9,7 @@ import { users, plans, subscriptions, affiliates, affiliateClicks, affiliateLink
 import { eq, inArray, desc, sql, and, gte, lte } from 'drizzle-orm'
 import { z } from 'zod'
 import { mapPlanRow } from '../server/mappers/plan'
+import * as subs from '../lib/subsClient'
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
 import { getDb } from '../db'
@@ -525,6 +526,93 @@ if (AUTH_MODE === 'proxy') {
   }
 }
 
+// ---------- subs proxy routes
+const subsRate = new Map<string,{count:number,reset:number}>()
+async function subsRateLimit(c: any, next: any) {
+  const user: any = c.get('user')
+  const now = Date.now()
+  let rec = subsRate.get(user.email)
+  if (!rec || now > rec.reset) { rec = { count: 0, reset: now + 60_000 } }
+  if (rec.count >= 5) return c.json({ error: { code: 'rate_limited', message: 'Too many requests' } }, 429)
+  rec.count++; subsRate.set(user.email, rec); await next()
+}
+function ownsLogin(c: any, login: string) {
+  const user: any = c.get('user')
+  return user.role === 'admin' || user.email === login
+}
+function handleSubsError(c: any, e: any) {
+  if (e instanceof subs.SubsError && [401,403,404,409].includes(e.status)) {
+    return c.json({ error: { code: e.code, message: e.message } }, e.status)
+  }
+  console.error('subs proxy error', e)
+  return c.json({ error: { code: 'subs_error', message: 'subs error' } }, 502)
+}
+
+app.post('/api/subs/assign', requireAuth, subsRateLimit, async (c) => {
+  const body = await c.req.json().catch(() => ({}))
+  if (body.uid) return c.json({ error: { code: 'uid_not_allowed', message: 'uid not allowed' } }, 400)
+  const parsed = z.object({ login: z.string() }).safeParse(body)
+  if (!parsed.success) return c.json({ error: { code: 'invalid_input' } }, 400)
+  if (!ownsLogin(c, parsed.data.login)) return c.json({ error: 'forbidden' }, 403)
+  try {
+    const r = await subs.assign(parsed.data.login)
+    return c.json(r)
+  } catch (e) { return handleSubsError(c, e) }
+})
+
+app.post('/api/subs/reassign', requireAuth, subsRateLimit, async (c) => {
+  const body = await c.req.json().catch(() => ({}))
+  if (body.uid) return c.json({ error: { code: 'uid_not_allowed', message: 'uid not allowed' } }, 400)
+  const parsed = z.object({ login: z.string() }).safeParse(body)
+  if (!parsed.success) return c.json({ error: { code: 'invalid_input' } }, 400)
+  if (!ownsLogin(c, parsed.data.login)) return c.json({ error: 'forbidden' }, 403)
+  try {
+    const r = await subs.reassign(parsed.data.login)
+    return c.json(r)
+  } catch (e) { return handleSubsError(c, e) }
+})
+
+app.post('/api/subs/revoke', requireAuth, subsRateLimit, async (c) => {
+  const body = await c.req.json().catch(() => ({}))
+  const parsed = z.object({ login: z.string() }).safeParse(body)
+  if (!parsed.success) return c.json({ error: { code: 'invalid_input' } }, 400)
+  if (!ownsLogin(c, parsed.data.login)) return c.json({ error: 'forbidden' }, 403)
+  try {
+    await subs.revoke(parsed.data.login)
+    return c.body(null, 204)
+  } catch (e) { return handleSubsError(c, e) }
+})
+
+app.get('/api/subs/status', requireAuth, async (c) => {
+  const login = c.req.query('login')
+  if (!login) return c.json({ error: { code: 'login_required' } }, 400)
+  if (!ownsLogin(c, login)) return c.json({ error: 'forbidden' }, 403)
+  try {
+    const r = await subs.statusByLogin(login)
+    return c.json(r)
+  } catch (e) { return handleSubsError(c, e) }
+})
+
+app.get('/api/subs/link', requireAuth, async (c) => {
+  const login = c.req.query('login')
+  const fmt = c.req.query('fmt') as 'plain' | 'b64' | undefined
+  if (!login || !fmt) return c.json({ error: { code: 'invalid_input' } }, 400)
+  if (!ownsLogin(c, login)) return c.json({ error: 'forbidden' }, 403)
+  try {
+    const txt = await subs.subLink({ login }, fmt)
+    return c.text(txt)
+  } catch (e) { return handleSubsError(c, e) }
+})
+
+app.get('/api/subs/qrcode', requireAuth, async (c) => {
+  const login = c.req.query('login')
+  if (!login) return c.json({ error: { code: 'login_required' } }, 400)
+  if (!ownsLogin(c, login)) return c.json({ error: 'forbidden' }, 403)
+  try {
+    const buf = await subs.qrcode({ login })
+    return new Response(buf, { headers: { 'content-type': 'image/png' } })
+  } catch (e) { return handleSubsError(c, e) }
+})
 // ---------- STATIC + SPA ----------
 // autodetect build dir
 const hasClient = fsSync.existsSync('./dist/client/index.html')
